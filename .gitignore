@@ -1,0 +1,42 @@
+# ===== macOS =====
+.DS_Store
+.DS_Store?
+
+# ===== Python / Django =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+*.pkl
+.db.sqlite3
+*.sqlite3
+train_status.json
+
+# ===== Dataset & captures (large / generated) =====
+backend/dataset/
+backend/media/
+backend/staticfiles/
+
+# ===== Environment / secrets =====
+.env
+.env.*
+!.env.example
+!.env.production.example
+!deploy/docker/.env.example
+
+# ===== Node / frontend =====
+node_modules/
+dist/
+frontend/dist/
+*.local
+*.log
+
+# ===== IDE / tools =====
+.idea/
+.vscode/
+*.swp
+
+# ===== Docker =====
+deploy/docker/.env

@@ -1,0 +1,52 @@
+# nginx config for the Attendance frontend container.
+# Serves the built SPA and proxies /api + /admin to the "backend" service.
+
+# Optional TLS. By default HTTP only. To enable HTTPS, mount your certs at
+# /etc/nginx/certs/fullchain.pem + privkey.pem and uncomment the server 443
+# block (or better: run certbot on the host and use a host nginx as reverse
+# proxy — see COLLEGE_VM.md).
+
+upstream backend {
+    server backend:8000;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Large uploads for classroom photos
+    client_max_body_size 30m;
+
+    # API -> Django
+    location /api/ {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Django admin
+    location /admin/ {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Django static (admin assets) — served by gunicorn via WhiteNoise
+    location /static/ {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

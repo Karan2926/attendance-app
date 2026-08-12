@@ -1,0 +1,35 @@
+# Attendance backend — gunicorn systemd service
+# Place at: /etc/systemd/system/attendance.service
+# Then: systemctl daemon-reload && systemctl enable --now attendance
+
+[Unit]
+Description=Attendance API (gunicorn)
+After=network.target postgresql.service
+
+[Service]
+Type=notify
+# The user running the app. Create it with:
+#   useradd -r -s /bin/false attendance
+User=attendance
+Group=attendance
+
+# Worker tuning — start with 3-5 workers and +2 threads. Each worker loads
+# a copy of the face model into memory, so don't set workers too high.
+# Rule of thumb: (2 x CPU cores) + 1, capped so RAM isn't exhausted.
+WorkingDirectory=/opt/attendance-app/backend
+EnvironmentFile=/opt/attendance-app/backend/.env
+ExecStart=/opt/attendance-app/backend/.venv/bin/gunicorn config.wsgi:application \
+    --bind 127.0.0.1:8000 \
+    --workers 4 \
+    --threads 2 \
+    --timeout 120 \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
+    --access-logfile /var/log/attendance/access.log \
+    --error-logfile /var/log/attendance/error.log
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
