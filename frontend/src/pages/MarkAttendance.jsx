@@ -60,7 +60,7 @@ export default function MarkAttendance() {
     }
   };
 
-  const { videoRef, live, start, stop, error } = useCamera({ width: 640, height: 480 }, onFrame);
+  const { videoRef, live, start, stop, error } = useCamera(onFrame, { width: 640, height: 480 });
   const recognizedRef = useRef(new Set());
 
   useEffect(() => {
