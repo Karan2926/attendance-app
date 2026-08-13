@@ -1,0 +1,15 @@
+{
+  "n_students": 41,
+  "n_probes": 41,
+  "n_genuine": 41,
+  "n_imposter": 1640,
+  "genuine_mean": 1.0000000116301746,
+  "genuine_min": 0.9999999403953552,
+  "imposter_mean": 0.06961816770887774,
+  "imposter_max": 0.2983548641204834,
+  "eer_threshold": 0.3000000000000001,
+  "balanced_optimum": 0.3000000000000001,
+  "safe_threshold": 0.2700000000000001,
+  "safe_frr": 0.0,
+  "safe_far": 0.004878048780487805
+}
