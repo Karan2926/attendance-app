@@ -22,9 +22,9 @@ async function request(path, options = {}) {
   // Build the body: stringify plain objects as JSON (fetch does NOT do this
   // automatically — it would send "[object Object]" and break the API).
   let body = options.body;
-  if (body && !(body instanceof FormData) && !(body instanceof Blob) && typeof body !== "string") {
+  if (body && !(body instanceof FormData) && !(body instanceof Blob)) {
     if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-    body = JSON.stringify(body);
+    if (typeof body !== "string") body = JSON.stringify(body);
   }
 
   const res = await fetch(`${BASE}/api${path}`, { ...options, body, headers });
