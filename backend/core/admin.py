@@ -3,12 +3,14 @@ from django.contrib.auth.admin import UserAdmin
 
 from .models import (
     Attendance,
+    AuditLog,
     Enrollment,
     FaceEmbedding,
     RoleUser,
     SchoolClass,
     Student,
     Subject,
+    SystemSetting,
     TeacherAssignment,
 )
 
@@ -56,3 +58,16 @@ class AttendanceAdmin(admin.ModelAdmin):
 @admin.register(FaceEmbedding)
 class FaceEmbeddingAdmin(admin.ModelAdmin):
     list_display = ("student_id", "dim", "sample_count", "updated_at")
+
+
+@admin.register(SystemSetting)
+class SystemSettingAdmin(admin.ModelAdmin):
+    list_display = ("key", "value", "updated_at")
+    search_fields = ("key",)
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ("id", "actor", "action", "target", "created_at")
+    list_filter = ("action",)
+    search_fields = ("actor__username", "action", "target", "detail")

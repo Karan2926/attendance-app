@@ -503,3 +503,175 @@ class PortalApiTests(TestCase):
         res = self.client.get("/api/portal/v1/attendance")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["count"], 0)
+
+
+def make_jpeg_bytes(size=(64, 64)):
+    """Return bytes of a tiny valid JPEG (no file writes)."""
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", size, (200, 100, 50)).save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+class ImageSecurityTests(TestCase):
+    """Upload hardening — core/image_security.py + the API endpoints."""
+
+    def test_sanitizer_accepts_valid_jpeg(self):
+        from .image_security import sanitize_image
+
+        clean = sanitize_image(make_jpeg_bytes())
+        self.assertTrue(clean.startswith(b"\xff\xd8\xff"))
+
+    def test_sanitizer_rejects_non_image(self):
+        from .image_security import ImageValidationError, sanitize_image
+
+        for blob in (b"<script>alert(1)</script>", b"MZ\x90\x00 binary", b"\x00\x01\x02\x03"):
+            with self.assertRaises(ImageValidationError):
+                sanitize_image(blob)
+
+    def test_sanitizer_rejects_oversized_file(self):
+        from .image_security import ImageValidationError, sanitize_image
+        from django.test import override_settings
+
+        with override_settings(MAX_IMAGE_UPLOAD_MB=1):
+            with self.assertRaises(ImageValidationError):
+                sanitize_image(b"A" * (1024 * 1024 + 10))
+
+    def test_sanitizer_rejects_decompression_bomb_pixels(self):
+        from .image_security import ImageValidationError, sanitize_image
+        from django.test import override_settings
+
+        # 64x64 = 4096 px, cap at 100 -> rejected by the pixel check
+        with override_settings(MAX_IMAGE_PIXELS=100):
+            with self.assertRaises(ImageValidationError):
+                sanitize_image(make_jpeg_bytes())
+
+    def test_upload_endpoint_skips_invalid_file(self):
+        import tempfile
+        from unittest import mock
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        with mock.patch("core.views.DATASET_DIR", tempfile.mkdtemp()):
+            u = make_user("imgadmin", "admin")
+            token, _ = Token.objects.get_or_create(user=u)
+            c = APIClient()
+            c.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+            res = c.post(
+                "/api/students/1/upload_face",
+                {"images[]": SimpleUploadedFile("evil.txt", b"not an image at all")},
+                format="multipart",
+            )
+            self.assertEqual(res.data["saved"], 0)
+            self.assertEqual(res.data["rejected"], 1)
+
+    def test_upload_endpoint_saves_valid_image(self):
+        import tempfile
+        from unittest import mock
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        st = Student.objects.create(name="Face Student", roll="F1")
+        u = make_user("imgadmin2", "admin")
+        token, _ = Token.objects.get_or_create(user=u)
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        with mock.patch("core.views.DATASET_DIR", tempfile.mkdtemp()):
+            res = c.post(
+                f"/api/students/{st.id}/upload_face",
+                {"images[]": SimpleUploadedFile("face.jpg", make_jpeg_bytes())},
+                format="multipart",
+            )
+            self.assertEqual(res.data["saved"], 1)
+            self.assertEqual(res.data["rejected"], 0)
+
+
+class AdminManagementTests(TestCase):
+    """Teacher accounts, system settings, audit log, system stats."""
+
+    def setUp(self):
+        self.admin = make_user("root", "admin", password="adminpass123")
+        self.token, _ = Token.objects.get_or_create(user=self.admin)
+        self.client = APIClient()
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def _make_teacher(self, username="t1"):
+        u = make_user(username, "teacher", password="teacherpass123")
+        return u
+
+    def test_deactivate_teacher(self):
+        t = self._make_teacher()
+        res = self.client.put(f"/api/teachers/{t.id}", {"active": False}, format="json")
+        self.assertEqual(res.status_code, 200)
+        t.refresh_from_db()
+        self.assertFalse(t.is_active)
+
+    def test_cannot_deactivate_self(self):
+        res = self.client.put(f"/api/teachers/{self.admin.id}", {"active": False}, format="json")
+        self.assertEqual(res.status_code, 400)
+
+    def test_delete_teacher(self):
+        t = self._make_teacher()
+        res = self.client.delete(f"/api/teachers/{t.id}/delete")
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(RoleUser.objects.filter(id=t.id).exists())
+
+    def test_teacher_cannot_access_admin_endpoints(self):
+        t = self._make_teacher("t2")
+        ttoken, _ = Token.objects.get_or_create(user=t)
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Token {ttoken.key}")
+        self.assertEqual(c.get("/api/admin/audit").status_code, 403)
+        self.assertEqual(c.get("/api/admin/system_stats").status_code, 403)
+        self.assertEqual(c.get("/api/admin/settings").status_code, 403)
+
+    def test_settings_get_and_update(self):
+        res = self.client.get("/api/admin/settings")
+        self.assertEqual(res.status_code, 200)
+        keys = {s["key"] for s in res.data["settings"]}
+        self.assertIn("recognition.live_threshold", keys)
+
+        res = self.client.post(
+            "/api/admin/settings/update",
+            {"settings": {"recognition.live_threshold": 0.5}},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        from .services import get_float_setting
+
+        self.assertAlmostEqual(get_float_setting("recognition.live_threshold", 0.34), 0.5)
+
+    def test_settings_clamped_to_range(self):
+        res = self.client.post(
+            "/api/admin/settings/update",
+            {"settings": {"recognition.live_threshold": 99}},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        from .services import get_float_setting
+
+        self.assertAlmostEqual(get_float_setting("recognition.live_threshold", 0.34), 1.0)
+
+    def test_audit_log_records_actions(self):
+        self.client.post(
+            "/api/teachers",
+            {"username": "t3", "password": "teacherpass123", "full_name": "T3"},
+            format="json",
+        )
+        res = self.client.get("/api/admin/audit")
+        self.assertEqual(res.status_code, 200)
+        actions = [l["action"] for l in res.data["logs"]]
+        self.assertIn("teacher.created", actions)
+
+    def test_system_stats_shape(self):
+        from core.models import Student
+
+        Student.objects.create(name="Stats Student", roll="S1")
+        res = self.client.get("/api/admin/system_stats")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["students"], 1)
+        self.assertIn("per_teacher", res.data)
+        self.assertIn("per_class", res.data)

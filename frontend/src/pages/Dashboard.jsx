@@ -139,6 +139,96 @@ export default function Dashboard() {
     }
   }
 
+  const trainCard = (
+    <div className="card2">
+      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <span className="eyebrow">Recognition model</span>
+          <h5 style={{ margin: 0 }}>Train Model</h5>
+        </div>
+        <button className="btn2 btn2-primary" onClick={startTraining} disabled={trainStatus?.running}>
+          Start Training
+        </button>
+      </div>
+      <div className="mt-3">
+        <div className="progress2">
+          <div className="progress2-bar" style={{ width: `${trainStatus?.progress || 0}%` }} />
+        </div>
+        <div className="mt-2 mono" style={{ color: "var(--ink-soft)", fontSize: "0.8rem" }}>
+          {trainStatus?.message || "Add students with face photos, then train."}
+        </div>
+        {storage && (
+          <div className="mt-2 mono" style={{ color: "var(--ink-soft)", fontSize: "0.78rem" }}>
+            Dataset: {storage.dataset.mb} MB · {storage.dataset.students} students ·{" "}
+            {storage.face_embeddings} embeddings
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (role === "admin") {
+    return (
+      <div className="page">
+        <div className="dash-hero">
+          <div className="dash-hero-main">
+            <span className="eyebrow">admin workspace</span>
+            <h1>System Management</h1>
+            <p>
+              Set up classes, subjects and teacher access. Attendance marking is
+              handled by teachers — this console keeps the system running.
+            </p>
+          </div>
+          <div className="dash-stat">
+            <span className="eyebrow">Scope</span>
+            <div className="num">{dash?.class_count ?? "—"}</div>
+            <div className="mono" style={{ color: "var(--ink-soft)", marginTop: "0.4rem", fontSize: "0.78rem" }}>
+              class{dash?.class_count === 1 ? "" : "es"}
+            </div>
+          </div>
+        </div>
+
+        <div className="row g-4">
+          <div className="col-lg-4">
+            <div className="card2">
+              <span className="eyebrow">Admin actions</span>
+              <h5 style={{ margin: "0 0 1rem" }}>Structure &amp; access</h5>
+              <div className="d-grid gap-2">
+                <Link className="btn2 btn2-primary" to="/admin">
+                  Manage classes &amp; teachers
+                </Link>
+                <Link className="btn2 btn2-outline" to="/attendance_record">
+                  View all attendance
+                </Link>
+              </div>
+              <div className="mt-3 mono" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                Tip: create classes, add subjects, then assign each teacher their
+                class + subject so they can mark attendance.
+              </div>
+            </div>
+          </div>
+
+          <div className="col-lg-8">
+            {trainCard}
+            <div className="card2 mt-4">
+              <span className="eyebrow">How roles work</span>
+              <h5 style={{ margin: "0 0 0.75rem" }}>Admin vs Teacher</h5>
+              <p className="panel-copy" style={{ margin: 0 }}>
+                <strong>Admin</strong> — manages the structure: classes, subjects,
+                teachers, assignments and the recognition model.
+              </p>
+              <p className="panel-copy" style={{ margin: "0.5rem 0 0" }}>
+                <strong>Teacher</strong> — runs the daily flow: adds students with
+                face photos, marks attendance, reviews records and exports the
+                register.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <div className="dash-hero">
@@ -191,41 +281,12 @@ export default function Dashboard() {
               <Link className="btn2 btn2-teal" to="/copilot">
                 AI Attendance Copilot
               </Link>
-              {role === "admin" && (
-                <Link className="btn2 btn2-outline" to="/admin">
-                  Manage classes &amp; teachers
-                </Link>
-              )}
             </div>
           </div>
         </div>
 
         <div className="col-lg-8">
-          <div className="card2">
-            <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-              <div>
-                <span className="eyebrow">Recognition model</span>
-                <h5 style={{ margin: 0 }}>Train Model</h5>
-              </div>
-              <button className="btn2 btn2-primary" onClick={startTraining} disabled={trainStatus?.running}>
-                Start Training
-              </button>
-            </div>
-            <div className="mt-3">
-              <div className="progress2">
-                <div className="progress2-bar" style={{ width: `${trainStatus?.progress || 0}%` }} />
-              </div>
-              <div className="mt-2 mono" style={{ color: "var(--ink-soft)", fontSize: "0.8rem" }}>
-                {trainStatus?.message || "Add students with face photos, then train."}
-              </div>
-              {storage && (
-                <div className="mt-2 mono" style={{ color: "var(--ink-soft)", fontSize: "0.78rem" }}>
-                  Dataset: {storage.dataset.mb} MB · {storage.dataset.students} students ·{" "}
-                  {storage.face_embeddings} embeddings
-                </div>
-              )}
-            </div>
-          </div>
+          {trainCard}
 
           <div className="card2 mt-4">
             <span className="eyebrow">Last 30 days · your classes</span>

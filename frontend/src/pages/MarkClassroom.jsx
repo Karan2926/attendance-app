@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, postFormData } from "../api";
 import usePageTitle from "../components/usePageTitle";
@@ -62,6 +62,8 @@ export default function MarkClassroom() {
   const [analyzing, setAnalyzing] = useState(false);
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
+
+  const handleSessionSelect = useCallback((s) => setSession(s), []);
 
   const { videoRef, live, start, stop, error } = useCamera(() => {}, { width: 1280, height: 720 });
 
@@ -260,7 +262,7 @@ export default function MarkClassroom() {
           <p className="panel-copy">Best for 80+ seats — take a few angles, then analyze once.</p>
 
           <div className="session-bar">
-            <ClassSubjectSelector onSelect={(s) => setSession(s)} />
+            <ClassSubjectSelector onSelect={handleSessionSelect} />
           </div>
 
           <div className="d-flex gap-2 mb-3 flex-wrap">

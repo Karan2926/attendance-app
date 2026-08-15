@@ -186,6 +186,14 @@ REGISTER_INVITE_CODE = os.environ.get("REGISTER_INVITE_CODE", "").strip()
 KEEP_CAPTURE_IMAGES = os.environ.get("KEEP_CAPTURE_IMAGES", "0") == "1"
 MAX_CAPTURE_IMAGES = int(os.environ.get("MAX_CAPTURE_IMAGES", "48"))
 MAX_CONTENT_LENGTH_MB = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "20"))
+# Image upload hardening (see core/image_security.py)
+MAX_IMAGE_UPLOAD_MB = int(os.environ.get("MAX_IMAGE_UPLOAD_MB", "10"))
+MAX_IMAGE_PIXELS = int(os.environ.get("MAX_IMAGE_PIXELS", "30000000"))
+MAX_IMAGE_SIDE = int(os.environ.get("MAX_IMAGE_SIDE", "9000"))
+
+# Django hard request-body limit (nginx also caps at 30m). Postgres-side DoS
+# guard: anything over this is rejected before the view runs.
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("DATA_UPLOAD_MAX_MEMORY_SIZE", str(25 * 1024 * 1024)))
 
 PORTAL_API_KEY = os.environ.get("PORTAL_API_KEY", "").strip()
 PORTAL_PUSH_URL = os.environ.get("PORTAL_PUSH_URL", "").strip()

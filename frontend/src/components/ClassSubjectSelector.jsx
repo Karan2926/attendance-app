@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 
 // Cascading Class → Subject selects. Mirrors the Flask class_subject.js behavior.
@@ -13,6 +13,11 @@ export default function ClassSubjectSelector({
   const [classId, setClassId] = useState("");
   const [subjects, setSubjects] = useState([]);
   const [subjectId, setSubjectId] = useState("");
+
+  // Keep onSelect in a ref so the notify effect only reruns on real selection
+  // changes, never when the parent passes a fresh inline arrow function.
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
 
   useEffect(() => {
     api
@@ -42,8 +47,9 @@ export default function ClassSubjectSelector({
   }, [classId]);
 
   useEffect(() => {
-    if (onSelect) onSelect({ classId, subjectId });
-  }, [classId, subjectId, onSelect]);
+    if (onSelectRef.current) onSelectRef.current({ classId, subjectId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId, subjectId]);
 
   return (
     <>

@@ -191,3 +191,39 @@ class PortalSyncLog(models.Model):
 
     class Meta:
         db_table = "portal_sync_log"
+
+
+class SystemSetting(models.Model):
+    """Admin-configurable settings (key/value). Thresholds live here so they
+    can be tuned from the Admin UI without touching code."""
+
+    key = models.CharField(max_length=64, unique=True)
+    value = models.TextField(null=True, blank=True)
+    updated_at = models.TextField(null=True, blank=True, default=now_iso)
+
+    class Meta:
+        db_table = "system_settings"
+
+
+class AuditLog(models.Model):
+    """Append-only trail of admin/relevant write actions for accountability."""
+
+    actor = models.ForeignKey(
+        "RoleUser",
+        null=True,
+        blank=True,
+        db_column="actor_id",
+        on_delete=models.SET_NULL,
+    )
+    action = models.CharField(max_length=64)
+    target = models.CharField(max_length=255, null=True, blank=True)
+    detail = models.TextField(null=True, blank=True)
+    created_at = models.TextField(null=True, blank=True, default=now_iso)
+
+    class Meta:
+        db_table = "audit_log"
+        indexes = [
+            models.Index(fields=["-id"]),
+            models.Index(fields=["action"]),
+            models.Index(fields=["created_at"]),
+        ]

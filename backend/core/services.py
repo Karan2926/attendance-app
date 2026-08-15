@@ -9,12 +9,14 @@ from django.db import IntegrityError, connection, transaction
 
 from .models import (
     Attendance,
+    AuditLog,
     Enrollment,
     FaceEmbedding,
     RoleUser,
     SchoolClass,
     Student,
     Subject,
+    SystemSetting,
     TeacherAssignment,
     now_iso,
 )
@@ -295,3 +297,43 @@ def log_portal_sync(direction, entity, status, detail):
     PortalSyncLog.objects.create(
         direction=direction, entity=entity, status=status, detail=detail
     )
+
+
+# ---------------------------------------------------------------------------
+# System settings + audit log
+# ---------------------------------------------------------------------------
+def get_setting(key: str, default=None):
+    """Return a SystemSetting value (raw string) or the default."""
+    row = SystemSetting.objects.filter(key=key).only("value").first()
+    if row and row.value not in (None, ""):
+        return row.value
+    return default
+
+
+def get_float_setting(key: str, default: float) -> float:
+    try:
+        return float(get_setting(key, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def set_setting(key: str, value) -> None:
+    SystemSetting.objects.update_or_create(
+        key=key, defaults={"value": str(value), "updated_at": now_iso()}
+    )
+
+
+def log_action(actor, action: str, target: str | None = None, detail: str | None = None) -> None:
+    """Write an audit-trail entry. actor may be a RoleUser or None."""
+    from .models import AuditLog
+
+    try:
+        AuditLog.objects.create(
+            actor=actor if getattr(actor, "pk", None) else None,
+            action=action,
+            target=target,
+            detail=detail,
+        )
+    except Exception:
+        # Never let audit logging break the primary action.
+        pass

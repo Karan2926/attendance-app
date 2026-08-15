@@ -37,6 +37,13 @@ function GuestOnly({ children }) {
   return children;
 }
 
+function RequireRole({ roles, children }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user || !roles.includes(user.role)) return <Navigate to="/" replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -60,16 +67,86 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/my_attendance" element={<MyAttendance />} />
-          <Route path="/add_student" element={<AddStudent />} />
-          <Route path="/manage_students" element={<ManageStudents />} />
-          <Route path="/mark_attendance" element={<MarkAttendance />} />
-          <Route path="/mark_attendance_classroom" element={<MarkClassroom />} />
-          <Route path="/attendance_record" element={<Records />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/copilot" element={<Copilot />} />
-          <Route path="/register_export" element={<RegisterExport />} />
-          <Route path="/admin" element={<Admin />} />
+          <Route
+            path="/my_attendance"
+            element={
+              <RequireRole roles={["student"]}>
+                <MyAttendance />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/add_student"
+            element={
+              <RequireRole roles={["teacher"]}>
+                <AddStudent />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/manage_students"
+            element={
+              <RequireRole roles={["teacher"]}>
+                <ManageStudents />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/mark_attendance"
+            element={
+              <RequireRole roles={["teacher"]}>
+                <MarkAttendance />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/mark_attendance_classroom"
+            element={
+              <RequireRole roles={["teacher"]}>
+                <MarkClassroom />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/attendance_record"
+            element={
+              <RequireRole roles={["teacher", "admin"]}>
+                <Records />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <RequireRole roles={["teacher"]}>
+                <Analytics />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/copilot"
+            element={
+              <RequireRole roles={["teacher"]}>
+                <Copilot />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/register_export"
+            element={
+              <RequireRole roles={["teacher"]}>
+                <RegisterExport />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <RequireRole roles={["admin"]}>
+                <Admin />
+              </RequireRole>
+            }
+          />
         </Route>
       </Route>
 

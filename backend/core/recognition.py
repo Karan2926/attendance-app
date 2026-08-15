@@ -24,6 +24,10 @@ CLASSROOM_SIM_THRESHOLD = 0.28
 CLASSROOM_STRONG_THRESHOLD = 0.32
 MARGIN = 0.03
 CLASSROOM_MARGIN = 0.02
+# Absolute ceiling for decoded bitmaps (see _decode_image). Higher than the
+# upload limit because legitimate classroom shots are large, but still stops
+# decompression-bomb OOMs.
+MAX_DECODE_PIXELS = 60_000_000
 
 _face_apps: dict[tuple[int, int], object] = {}
 
@@ -99,9 +103,24 @@ def get_face_app(det_size: tuple[int, int] = (640, 640)):
 def _decode_image(stream_or_bytes):
     import cv2
 
-    data = stream_or_bytes.read()
-    arr = np.frombuffer(data, np.uint8)
-    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    try:
+        data = stream_or_bytes.read()
+    except Exception:
+        return None
+    if not data:
+        return None
+    try:
+        arr = np.frombuffer(data, np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    except Exception:
+        return None
+    if img is None:
+        return None
+    # Defense in depth: never hand an absurdly large bitmap to the face model
+    # even if a caller bypasses the upload sanitizer.
+    h, w = img.shape[:2]
+    if w <= 0 or h <= 0 or (w * h) > MAX_DECODE_PIXELS:
+        return None
     return img
 
 

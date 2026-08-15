@@ -43,6 +43,18 @@ export default function Layout() {
                 My Attendance
               </NavLink>
             </>
+          ) : role === "admin" ? (
+            <>
+              <NavLink to="/" className={navLinkClass} end>
+                Dashboard
+              </NavLink>
+              <NavLink to="/admin" className={navLinkClass}>
+                Manage System
+              </NavLink>
+              <NavLink to="/admin?tab=audit" className={navLinkClass}>
+                Audit Log
+              </NavLink>
+            </>
           ) : (
             <>
               <NavLink to="/add_student" className={navLinkClass}>
@@ -66,11 +78,6 @@ export default function Layout() {
               <NavLink to="/copilot" className={navLinkClass}>
                 AI Copilot
               </NavLink>
-              {role === "admin" && (
-                <NavLink to="/admin" className={navLinkClass}>
-                  Admin
-                </NavLink>
-              )}
             </>
           )}
           <div className="nav-user">

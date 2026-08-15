@@ -13,6 +13,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Count
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -22,8 +23,10 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from . import services, training
+from .image_security import ImageValidationError, read_upload, sanitize_image
 from .models import (
     Attendance,
+    AuditLog,
     Enrollment,
     FaceEmbedding,
     SchoolClass,
@@ -34,6 +37,12 @@ from .models import (
 )
 from .permissions import IsAdmin, IsStudent, IsTeacherOrAdmin
 from .rate_limit import rate_limit
+from .recognition import (
+    CLASSROOM_MARGIN,
+    CLASSROOM_SIM_THRESHOLD,
+    CLASSROOM_STRONG_THRESHOLD,
+    LIVE_SIM_THRESHOLD,
+)
 
 DATASET_DIR = settings.DATASET_DIR
 os.makedirs(DATASET_DIR, exist_ok=True)
@@ -232,6 +241,7 @@ def classes_view(request):
     c = SchoolClass.objects.create(
         name=name, section=section, academic_year=year, created_at=now_iso()
     )
+    services.log_action(request.user, "class.created", target=f"Class #{c.id} ({c.label()})")
     return Response({"class_id": c.id}, status=201)
 
 
@@ -260,6 +270,11 @@ def subjects_view(request, class_id):
     s = Subject.objects.create(
         school_class_id=class_id, name=name, code=code, created_at=now_iso()
     )
+    services.log_action(
+        request.user,
+        "subject.created",
+        target=f"Subject #{s.id} ({s.name}) in class #{class_id}",
+    )
     return Response({"subject_id": s.id}, status=201)
 
 
@@ -282,6 +297,12 @@ def create_teacher_view(request):
             )
     except IntegrityError:
         return Response({"error": "username already exists"}, status=409)
+    services.log_action(
+        request.user,
+        "teacher.created",
+        target=f"Teacher #{user.id} ({username})",
+        detail=full_name or "",
+    )
     return Response({"user_id": user.id}, status=201)
 
 
@@ -311,6 +332,11 @@ def assign_teacher_view(request):
             )
     except IntegrityError:
         return Response({"error": "assignment already exists"}, status=409)
+    services.log_action(
+        request.user,
+        "assignment.created",
+        target=f"Teacher #{user_id} → class #{class_id} subject #{subject_id}",
+    )
     return Response({"assignment_id": a.id}, status=201)
 
 
@@ -393,6 +419,248 @@ def admin_overview_view(request):
 
 
 # ---------------------------------------------------------------------------
+# Admin — teacher accounts, system settings, audit
+# ---------------------------------------------------------------------------
+SETTING_DEFS = [
+    {
+        "key": "recognition.live_threshold",
+        "label": "Live mark confidence",
+        "default": LIVE_SIM_THRESHOLD,
+        "min": 0.0,
+        "max": 1.0,
+        "step": 0.01,
+        "group": "recognition",
+        "hint": "Minimum similarity to auto-mark attendance in live webcam mode. "
+        "Higher = stricter (fewer false matches, more Unknown).",
+    },
+    {
+        "key": "recognition.classroom_threshold",
+        "label": "Classroom match confidence",
+        "default": CLASSROOM_SIM_THRESHOLD,
+        "min": 0.0,
+        "max": 1.0,
+        "step": 0.01,
+        "group": "recognition",
+        "hint": "Minimum similarity to consider a classroom-photo face a match. "
+        "Lower = more students auto-recognized, higher risk of wrong matches.",
+    },
+    {
+        "key": "recognition.classroom_strong_threshold",
+        "label": "Classroom 'needs review' cutoff",
+        "default": CLASSROOM_STRONG_THRESHOLD,
+        "min": 0.0,
+        "max": 1.0,
+        "step": 0.01,
+        "group": "recognition",
+        "hint": "Matches below this confidence are flagged 'Needs review' so a "
+        "teacher double-checks before saving.",
+    },
+    {
+        "key": "recognition.classroom_margin",
+        "label": "Classroom similarity margin",
+        "default": CLASSROOM_MARGIN,
+        "min": 0.0,
+        "max": 0.1,
+        "step": 0.005,
+        "group": "recognition",
+        "hint": "Extra cosine-similarity buffer used when ranking classroom faces. "
+        "Rarely needs changing.",
+    },
+]
+
+_SETTING_DEFS_BY_KEY = {d["key"]: d for d in SETTING_DEFS}
+
+
+def _effective_setting(key, default):
+    return services.get_float_setting(key, default)
+
+
+@api_view(["PUT"])
+@permission_classes([IsAdmin])
+def update_teacher_view(request, teacher_id):
+    """Activate / deactivate a teacher account (soft removal)."""
+    if request.user.id == teacher_id:
+        return Response({"error": "You cannot modify your own account"}, status=400)
+    user = get_user_model().objects.filter(id=teacher_id, role="teacher").first()
+    if not user:
+        return Response({"error": "teacher not found"}, status=404)
+    active = request.data.get("active")
+    if active is None:
+        return Response({"error": "active (bool) required"}, status=400)
+    user.is_active = bool(active)
+    user.save()
+    if not user.is_active:
+        Token.objects.filter(user=user).delete()
+    action = "teacher.activated" if user.is_active else "teacher.deactivated"
+    services.log_action(
+        request.user, action, target=f"Teacher #{user.id} ({user.username})"
+    )
+    return Response({"id": user.id, "active": user.is_active})
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAdmin])
+def delete_teacher_view(request, teacher_id):
+    """Permanently remove a teacher account (assignments cascade)."""
+    if request.user.id == teacher_id:
+        return Response({"error": "You cannot delete your own account"}, status=400)
+    user = get_user_model().objects.filter(id=teacher_id, role="teacher").first()
+    if not user:
+        return Response({"error": "teacher not found"}, status=404)
+    username = user.username
+    user.delete()
+    services.log_action(
+        request.user, "teacher.deleted", target=f"Teacher #{teacher_id} ({username})"
+    )
+    return Response({"deleted": True})
+
+
+@api_view(["GET"])
+@permission_classes([IsAdmin])
+def admin_system_stats_view(request):
+    today = datetime.date.today().isoformat()
+    week_ago = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
+    from .recognition import dataset_disk_usage
+
+    teachers = list(
+        get_user_model()
+        .objects.filter(role="teacher")
+        .values("id", "username", "full_name", "is_active", "created_at")
+        .order_by("username")
+    )
+    teacher_ids = [t["id"] for t in teachers]
+    class_counts = dict(
+        TeacherAssignment.objects.filter(user_id__in=teacher_ids)
+        .values_list("user_id")
+        .annotate(c=Count("id"))
+    )
+    today_by_teacher = dict(
+        Attendance.objects.filter(
+            marked_by_id__in=teacher_ids, attendance_day=today
+        )
+        .values_list("marked_by_id")
+        .annotate(c=Count("id"))
+    )
+    per_teacher = [
+        {
+            "id": t["id"],
+            "username": t["username"],
+            "full_name": t["full_name"],
+            "is_active": t["is_active"],
+            "class_count": class_counts.get(t["id"], 0),
+            "records_today": today_by_teacher.get(t["id"], 0),
+        }
+        for t in teachers
+    ]
+
+    class_records = dict(
+        Attendance.objects.filter(attendance_day=today)
+        .values_list("school_class_id")
+        .annotate(c=Count("id"))
+    )
+    classes = list(SchoolClass.objects.annotate(student_count=Count("students", distinct=True)))
+    per_class = [
+        {
+            "id": c.id,
+            "label": c.label(),
+            "student_count": c.student_count,
+            "records_today": class_records.get(c.id, 0),
+        }
+        for c in classes
+    ]
+
+    return Response(
+        {
+            "students": Student.objects.count(),
+            "classes": SchoolClass.objects.count(),
+            "subjects": Subject.objects.count(),
+            "teachers": len(teachers),
+            "teachers_active": sum(1 for t in teachers if t["is_active"]),
+            "attendance_today": Attendance.objects.filter(attendance_day=today).count(),
+            "attendance_7d": Attendance.objects.filter(attendance_day__gte=week_ago).count(),
+            "embeddings": services.face_embedding_count(),
+            "dataset_mb": dataset_disk_usage(DATASET_DIR)["mb"],
+            "per_teacher": per_teacher,
+            "per_class": per_class,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAdmin])
+def admin_settings_view(request):
+    def _def(d):
+        return {
+            "key": d["key"],
+            "label": d["label"],
+            "value": _effective_setting(d["key"], d["default"]),
+            "default": d["default"],
+            "min": d["min"],
+            "max": d["max"],
+            "step": d["step"],
+            "group": d.get("group", ""),
+            "hint": d.get("hint", ""),
+        }
+
+    return Response({"settings": [_def(d) for d in SETTING_DEFS]})
+
+
+@api_view(["POST"])
+@permission_classes([IsAdmin])
+def admin_update_settings_view(request):
+    updates = request.data.get("settings") or {}
+    if not isinstance(updates, dict) or not updates:
+        return Response({"error": "settings object required"}, status=400)
+
+    applied = []
+    for key, raw in updates.items():
+        d = _SETTING_DEFS_BY_KEY.get(key)
+        if not d:
+            continue
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return Response({"error": f"Invalid value for {key}"}, status=400)
+        value = max(d["min"], min(d["max"], value))
+        services.set_setting(key, value)
+        applied.append({"key": key, "value": value})
+
+    if not applied:
+        return Response({"error": "no known settings provided"}, status=400)
+    services.log_action(
+        request.user,
+        "settings.updated",
+        target="Recognition settings",
+        detail=", ".join(f"{a['key']}={a['value']}" for a in applied),
+    )
+    return Response({"updated": applied})
+
+
+@api_view(["GET"])
+@permission_classes([IsAdmin])
+def admin_audit_view(request):
+    rows = (
+        AuditLog.objects.select_related("actor")
+        .order_by("-id")[:200]
+    )
+    return Response(
+        {
+            "logs": [
+                {
+                    "id": r.id,
+                    "actor": r.actor.username if r.actor else None,
+                    "action": r.action,
+                    "target": r.target,
+                    "detail": r.detail,
+                    "created_at": r.created_at,
+                }
+                for r in rows
+            ]
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
 # Students
 # ---------------------------------------------------------------------------
 def _parse_class_subject(request):
@@ -402,6 +670,21 @@ def _parse_class_subject(request):
     except (TypeError, ValueError):
         return None, None
     return class_id, subject_id
+
+
+def _clean_upload(request, key="image"):
+    """Validate + sanitize an uploaded image.
+
+    Returns (BytesIO | None, Response | None). The response is a 400 error
+    when the upload is missing or rejected by the security layer.
+    """
+    f = request.FILES.get(key)
+    if not f:
+        return None, Response({"error": "no image"}, status=400)
+    clean, err = read_upload(f)
+    if err:
+        return None, Response({"error": err}, status=400)
+    return io.BytesIO(clean), None
 
 
 def _require_assignment(request):
@@ -486,6 +769,12 @@ def students_view(request):
             student=st, school_class_id=class_id, defaults={"created_at": now_iso()}
         )
     os.makedirs(os.path.join(DATASET_DIR, str(st.id)), exist_ok=True)
+    services.log_action(
+        request.user,
+        "student.created",
+        target=f"Student #{st.id} ({name})",
+        detail=f"roll={roll or '-'} class_id={class_id}",
+    )
     return Response({"student_id": st.id}, status=201)
 
 
@@ -509,6 +798,7 @@ def _save_compact_profile(src_path: str, dest_path: str) -> None:
 
 @api_view(["POST"])
 @permission_classes([IsTeacherOrAdmin])
+@rate_limit(lambda r: r.user.id, 30, 60)
 def upload_face_view(request, student_id):
     if not services.teacher_can_manage_student(request.user.id, request.user.role, student_id):
         return Response({"error": "Not authorized for this student"}, status=403)
@@ -516,25 +806,34 @@ def upload_face_view(request, student_id):
     files = request.FILES.getlist("images[]") or request.FILES.getlist("images")
     files = files[: settings.MAX_CAPTURE_IMAGES]
     saved = 0
+    rejected = 0
     folder = os.path.join(DATASET_DIR, str(student_id))
     os.makedirs(folder, exist_ok=True)
     has_profile = os.path.exists(os.path.join(folder, "profile.jpg"))
     for f in files:
+        clean, err = read_upload(f)
+        if err:
+            rejected += 1
+            continue
         try:
             fname = f"{datetime.datetime.utcnow().timestamp():.6f}_{saved}.jpg"
             path = os.path.join(folder, fname)
             with open(path, "wb") as out:
-                for chunk in f.chunks():
-                    out.write(chunk)
+                out.write(clean)
             if saved == 0 and not has_profile:
                 _save_compact_profile(path, os.path.join(folder, "profile.jpg"))
             saved += 1
         except Exception:
+            rejected += 1
             continue
+    note = "Captures are temporary. After Train Model, only profile.jpg is kept."
+    if rejected:
+        note += f" {rejected} file(s) skipped (invalid or too large)."
     return Response(
         {
             "saved": saved,
-            "note": "Captures are temporary. After Train Model, only profile.jpg is kept.",
+            "rejected": rejected,
+            "note": note,
         }
     )
 
@@ -590,10 +889,16 @@ def student_detail_view(request, student_id):
         return Response({"error": "Not authorized for this student"}, status=403)
 
     if request.method == "DELETE":
+        st_name = Student.objects.filter(id=student_id).values_list("name", flat=True).first()
         services.delete_student_cascade(student_id)
         folder = os.path.join(DATASET_DIR, str(student_id))
         if os.path.isdir(folder):
             shutil.rmtree(folder, ignore_errors=True)
+        services.log_action(
+            request.user,
+            "student.deleted",
+            target=f"Student #{student_id} ({st_name or '?'})",
+        )
         return Response({"deleted": True})
 
     st = Student.objects.filter(id=student_id).first()
@@ -683,10 +988,16 @@ def student_detail_view(request, student_id):
 def delete_student_view(request, student_id):
     if not services.teacher_can_manage_student(request.user.id, request.user.role, student_id):
         return Response({"error": "Not authorized for this student"}, status=403)
+    st_name = Student.objects.filter(id=student_id).values_list("name", flat=True).first()
     services.delete_student_cascade(student_id)
     folder = os.path.join(DATASET_DIR, str(student_id))
     if os.path.isdir(folder):
         shutil.rmtree(folder, ignore_errors=True)
+    services.log_action(
+        request.user,
+        "student.deleted",
+        target=f"Student #{student_id} ({st_name or '?'})",
+    )
     return Response({"deleted": True})
 
 
@@ -699,6 +1010,7 @@ def train_model_view(request):
     started = training.start_training()
     if not started:
         return Response({"status": "already_running"}, status=202)
+    services.log_action(request.user, "training.started", target="Recognition model")
     return Response({"status": "started"}, status=202)
 
 
@@ -729,7 +1041,11 @@ def storage_stats_view(request):
 def prune_captures_view(request):
     from .recognition import prune_capture_images
 
-    return Response(prune_capture_images(DATASET_DIR, keep_profile=True))
+    res = prune_capture_images(DATASET_DIR, keep_profile=True)
+    services.log_action(
+        request.user, "captures.pruned", detail=f"deleted={res['deleted']}"
+    )
+    return Response(res)
 
 
 # ---------------------------------------------------------------------------
@@ -737,24 +1053,27 @@ def prune_captures_view(request):
 # ---------------------------------------------------------------------------
 @api_view(["POST"])
 @permission_classes([IsTeacherOrAdmin])
+@rate_limit(lambda r: r.user.id, 60, 60)
 def check_face_view(request):
-    if "image" not in request.FILES:
-        return Response({"ok": False, "reason": "no image"}, status=400)
+    img_stream, err = _clean_upload(request)
+    if err:
+        return err
     from .recognition import check_face_quality
 
-    return Response(check_face_quality(request.FILES["image"]))
+    return Response(check_face_quality(img_stream))
 
 
 @api_view(["POST"])
 @permission_classes([IsTeacherOrAdmin])
+@rate_limit(lambda r: r.user.id, 60, 60)
 def recognize_face_view(request):
     class_id, subject_id, err = _require_assignment(request)
     if err:
         return err
 
-    if "image" not in request.FILES:
-        return Response({"recognized": False, "error": "no image"}, status=400)
-    img_file = request.FILES["image"]
+    img_stream, err = _clean_upload(request)
+    if err:
+        return err
 
     try:
         from .recognition import (
@@ -763,7 +1082,7 @@ def recognize_face_view(request):
             predict_with_model,
         )
 
-        face = extract_face_for_image(img_file)
+        face = extract_face_for_image(img_stream)
         if face is None:
             return Response({"recognized": False, "error": "no face detected"})
 
@@ -786,7 +1105,12 @@ def recognize_face_view(request):
 
         enrolled = services.student_ids_in_class(class_id)
         pred_label, conf = predict_with_model(
-            clf, emb, allowed_ids=enrolled if enrolled else None
+            clf,
+            emb,
+            allowed_ids=enrolled if enrolled else None,
+            similarity_threshold=_effective_setting(
+                "recognition.live_threshold", LIVE_SIM_THRESHOLD
+            ),
         )
         if pred_label is None:
             return Response(
@@ -807,6 +1131,13 @@ def recognize_face_view(request):
         saved = services.mark_present(
             [sid], class_id, subject_id, request.user.id, source="live"
         )
+        if saved > 0:
+            services.log_action(
+                request.user,
+                "attendance.marked",
+                target=f"Student #{sid} ({name})",
+                detail=f"class_id={class_id} subject_id={subject_id} source=live conf={conf:.3f}",
+            )
         return Response(
             {
                 "recognized": True,
@@ -827,26 +1158,24 @@ def recognize_face_view(request):
 
 @api_view(["POST"])
 @permission_classes([IsTeacherOrAdmin])
+@rate_limit(lambda r: r.user.id, 20, 60)
 def recognize_classroom_view(request):
     class_id, subject_id, err = _require_assignment(request)
     if err:
         return err
 
-    if "image" not in request.FILES:
-        return Response({"error": "no image"}, status=400)
-    img_file = request.FILES["image"]
+    img_stream, err = _clean_upload(request)
+    if err:
+        return err
 
     try:
         from .recognition import (
-            CLASSROOM_MARGIN,
-            CLASSROOM_SIM_THRESHOLD,
-            CLASSROOM_STRONG_THRESHOLD,
             extract_embeddings_for_classroom,
             load_model_if_exists,
             predict_with_model,
         )
 
-        faces = extract_embeddings_for_classroom(img_file)
+        faces = extract_embeddings_for_classroom(img_stream)
         if not faces:
             return Response({"faces": [], "message": "No faces detected"})
 
@@ -863,7 +1192,11 @@ def recognize_classroom_view(request):
                 }
             )
 
-        sim_thr = CLASSROOM_SIM_THRESHOLD
+        sim_thr = _effective_setting("recognition.classroom_threshold", CLASSROOM_SIM_THRESHOLD)
+        strong_thr = _effective_setting(
+            "recognition.classroom_strong_threshold", CLASSROOM_STRONG_THRESHOLD
+        )
+        margin = _effective_setting("recognition.classroom_margin", CLASSROOM_MARGIN)
         if len(enrolled) <= 5:
             sim_thr = min(sim_thr, 0.25)
 
@@ -874,7 +1207,7 @@ def recognize_classroom_view(request):
         for face in faces:
             emb = face["embedding"]
             pred_label, conf = predict_with_model(
-                clf, emb, allowed_ids=enrolled, similarity_threshold=sim_thr, margin=CLASSROOM_MARGIN
+                clf, emb, allowed_ids=enrolled, similarity_threshold=sim_thr, margin=margin
             )
             closest_id, closest_conf = predict_with_model(
                 clf, emb, allowed_ids=enrolled, similarity_threshold=0.0, margin=0.0
@@ -907,7 +1240,7 @@ def recognize_classroom_view(request):
                     entry["class"] = row["class_text"]
                     entry["student_id"] = sid
                     entry["confidence"] = float(conf)
-                    entry["needs_review"] = float(conf) < CLASSROOM_STRONG_THRESHOLD
+                    entry["needs_review"] = float(conf) < strong_thr
 
                     already = Attendance.objects.filter(
                         student_id=sid,
@@ -963,6 +1296,12 @@ def confirm_classroom_attendance_view(request):
     saved = services.mark_present(
         [int(sid) for sid in student_ids], class_id, subject_id, request.user.id, source="classroom"
     )
+    services.log_action(
+        request.user,
+        "attendance.confirmed",
+        target=f"class #{class_id} subject #{subject_id}",
+        detail=f"saved={saved} of {len(student_ids)} students",
+    )
     return Response({"saved": saved})
 
 
@@ -1017,6 +1356,12 @@ def delete_attendance_record_view(request, record_id):
     if class_ids is not None and row.school_class_id not in class_ids:
         return Response({"error": "Not authorized"}, status=403)
     row.delete()
+    services.log_action(
+        request.user,
+        "attendance.record.deleted",
+        target=f"Attendance #{record_id}",
+        detail=f"student={row.name or row.student_id} day={row.attendance_day}",
+    )
     return Response({"deleted": True})
 
 
