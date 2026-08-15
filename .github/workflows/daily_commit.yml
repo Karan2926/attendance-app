@@ -1,0 +1,29 @@
+name: Daily Contribution
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  daily-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Skip if a commit already exists today
+        run: |
+          if [ -n "$(TZ=Asia/Kolkata git log --since="$(TZ=Asia/Kolkata date +%Y-%m-%d) 00:00" --oneline)" ]; then
+            echo "Commit already made today, skipping."
+            exit 0
+          fi
+      - name: Make empty commit
+        run: |
+          git config user.name "Karan2926"
+          git config user.email "216119974+Karan2926@users.noreply.github.com"
+          git commit --allow-empty -m "Daily contribution $(TZ=Asia/Kolkata date +%Y-%m-%d)"
+          git push
