@@ -1,0 +1,13 @@
+[Unit]
+Description=Attendance app nightly database and face-data backup
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+User=attendance
+Group=attendance
+# Read DB credentials (DJANGO_DATABASE_URL) from the app .env
+EnvironmentFile=/opt/attendance-app/backend/.env
+ExecStartPre=/bin/mkdir -p /var/backups/attendance
+ExecStartPre=/bin/chown -R attendance:attendance /var/backups/attendance
+ExecStart=/opt/attendance-app/deploy/backup.sh

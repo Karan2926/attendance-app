@@ -44,6 +44,7 @@ export default function Login() {
           <label className="label2">Username</label>
           <input
             className="input2 mb-3"
+            aria-label="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
@@ -53,6 +54,7 @@ export default function Login() {
           <input
             className="input2 mb-3"
             type="password"
+            aria-label="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required

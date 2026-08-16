@@ -48,6 +48,26 @@ DATASET_DIR = settings.DATASET_DIR
 os.makedirs(DATASET_DIR, exist_ok=True)
 
 # ---------------------------------------------------------------------------
+# Health / monitoring
+# ---------------------------------------------------------------------------
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def health_view(request):
+    """Public liveness probe — used by deploy/healthcheck.sh."""
+    from django.db import connection
+
+    db_ok = True
+    try:
+        connection.ensure_connection()
+    except Exception:
+        db_ok = False
+    return Response(
+        {"status": "ok" if db_ok else "degraded", "database": "ok" if db_ok else "unreachable"},
+        status=200 if db_ok else 503,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
 def _user_payload(u):
@@ -582,6 +602,67 @@ def admin_system_stats_view(request):
             "dataset_mb": dataset_disk_usage(DATASET_DIR)["mb"],
             "per_teacher": per_teacher,
             "per_class": per_class,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAdmin])
+def admin_system_health_view(request):
+    """Admin health dashboard — DB, model, dataset, storage, latest backup."""
+    import glob
+    import json as _json
+
+    from django.db import connection
+
+    db_ok = True
+    try:
+        connection.ensure_connection()
+    except Exception:
+        db_ok = False
+
+    from .recognition import dataset_disk_usage
+
+    model_path = settings.MODEL_PATH or ""
+    model_exists = bool(model_path) and os.path.isfile(model_path)
+    model_mb = None
+    if model_exists:
+        try:
+            model_mb = round(os.path.getsize(model_path) / (1024 * 1024), 1)
+        except OSError:
+            model_mb = None
+
+    usage = dataset_disk_usage(settings.DATASET_DIR)
+
+    backup_dir = os.environ.get("ATTENDANCE_BACKUP_DIR", "/var/backups/attendance")
+    latest_backup = None
+    if os.path.isdir(backup_dir):
+        dumps = sorted(glob.glob(os.path.join(backup_dir, "db-*.dump")))
+        if dumps:
+            latest_backup = os.path.basename(dumps[-1])
+
+    train_status = {}
+    train_status_path = settings.TRAIN_STATUS_FILE or ""
+    if train_status_path and os.path.isfile(train_status_path):
+        try:
+            with open(train_status_path, encoding="utf-8") as f:
+                train_status = _json.load(f)
+        except Exception:
+            train_status = {}
+
+    return Response(
+        {
+            "status": "ok" if db_ok else "degraded",
+            "database": "ok" if db_ok else "unreachable",
+            "model": {"exists": model_exists, "size_mb": model_mb},
+            "dataset": {
+                "dir": settings.DATASET_DIR,
+                "size_mb": usage["mb"],
+                "files": usage["files"],
+                "students": usage["students"],
+            },
+            "train_status": train_status,
+            "backup": {"latest": latest_backup},
         }
     )
 

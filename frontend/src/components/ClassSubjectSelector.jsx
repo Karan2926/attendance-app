@@ -57,6 +57,7 @@ export default function ClassSubjectSelector({
         <label className="label2">Class</label>
         <select
           className="input2"
+          aria-label="Class"
           value={classId}
           onChange={(e) => setClassId(e.target.value)}
           disabled={disabled}
@@ -74,6 +75,7 @@ export default function ClassSubjectSelector({
         <label className="label2">Subject</label>
         <select
           className="input2"
+          aria-label="Subject"
           value={subjectId}
           onChange={(e) => setSubjectId(e.target.value)}
           disabled={!classId || disabled}

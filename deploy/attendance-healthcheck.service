@@ -1,0 +1,10 @@
+[Unit]
+Description=Attendance app periodic health probe
+
+[Service]
+Type=oneshot
+User=attendance
+Group=attendance
+ExecStartPre=/bin/mkdir -p /var/log/attendance
+ExecStartPre=/bin/chown -R attendance:attendance /var/log/attendance
+ExecStart=/opt/attendance-app/deploy/healthcheck.sh

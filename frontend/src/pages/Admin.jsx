@@ -9,6 +9,7 @@ const TABS = [
   { id: "teachers", label: "Teachers" },
   { id: "classes", label: "Classes & access" },
   { id: "settings", label: "Settings" },
+  { id: "health", label: "Health" },
   { id: "audit", label: "Audit log" },
 ];
 
@@ -50,6 +51,7 @@ export default function Admin() {
   const [stats, setStats] = useState(null);
   const [settings, setSettings] = useState(null);
   const [audit, setAudit] = useState(null);
+  const [health, setHealth] = useState(null);
 
   const [newTeacher, setNewTeacher] = useState({ full_name: "", username: "", password: "" });
   const [draft, setDraft] = useState({});
@@ -76,6 +78,11 @@ export default function Admin() {
       setAudit(await api.get("/admin/audit"));
     } catch {}
   }, []);
+  const loadHealth = useCallback(async () => {
+    try {
+      setHealth(await api.get("/admin/system_health"));
+    } catch {}
+  }, []);
 
   useEffect(() => {
     loadOverview();
@@ -89,6 +96,10 @@ export default function Admin() {
   useEffect(() => {
     if (tab === "audit") loadAudit();
   }, [tab, loadAudit]);
+
+  useEffect(() => {
+    if (tab === "health") loadHealth();
+  }, [tab, loadHealth]);
 
   useEffect(() => {
     if (tab === "teachers") loadStats();
@@ -440,6 +451,8 @@ export default function Admin() {
         </div>
       )}
 
+      {tab === "health" && <HealthTab health={health} onRefresh={loadHealth} />}
+
       {tab === "audit" && (
         <div className="card2">
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -667,6 +680,80 @@ function ClassAccessTab({ overview, classes, subjects, teachers, assignments, on
           </ul>
         </div>
       </div>
+    </div>
+  );
+}
+
+function HealthTab({ health, onRefresh }) {
+  return (
+    <div className="card2">
+      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <span className="eyebrow">System health</span>
+          <h5 style={{ margin: 0 }}>Live status of the deployment</h5>
+        </div>
+        <button className="btn2 btn2-outline btn-sm" onClick={onRefresh}>
+          Refresh
+        </button>
+      </div>
+
+      {!health ? (
+        <div className="mono mt-3" style={{ color: "var(--ink-soft)" }}>Loading…</div>
+      ) : (
+        <>
+          <div className="row g-3 mt-1">
+            <div className="col-lg-3 col-6">
+              <StatCard
+                label={health.database === "ok" ? "Database — OK" : "Database — UNREACHABLE"}
+                value={health.status === "ok" ? "OK" : "DOWN"}
+                hint={health.database}
+              />
+            </div>
+            <div className="col-lg-3 col-6">
+              <StatCard
+                label="Trained model"
+                value={health.model?.exists ? "Present" : "Missing"}
+                hint={health.model?.size_mb != null ? `${health.model.size_mb} MB` : "no model.pkl"}
+              />
+            </div>
+            <div className="col-lg-3 col-6">
+              <StatCard
+                label="Face dataset"
+                value={health.dataset?.size_mb ?? 0}
+                hint={`${health.dataset?.students ?? 0} students · ${health.dataset?.files ?? 0} photos`}
+              />
+            </div>
+            <div className="col-lg-3 col-6">
+              <StatCard
+                label="Latest backup"
+                value={health.backup?.latest ? "Found" : "None yet"}
+                hint={health.backup?.latest || "nightly at 02:00"}
+              />
+            </div>
+          </div>
+
+          <div className="row g-4 mt-3">
+            <div className="col-lg-6">
+              <div className="panel-copy" style={{ marginBottom: "0.4rem" }}>
+                <strong>Model training status</strong>
+              </div>
+              <pre className="mono" style={{ fontSize: "0.78rem", color: "var(--ink-soft)", margin: 0, whiteSpace: "pre-wrap" }}>
+                {JSON.stringify(health.train_status, null, 2)}
+              </pre>
+            </div>
+            <div className="col-lg-6">
+              <div className="panel-copy" style={{ marginBottom: "0.4rem" }}>
+                <strong>Dataset location</strong>
+              </div>
+              <div className="mono" style={{ fontSize: "0.8rem" }}>{health.dataset?.dir || "—"}</div>
+              <div className="panel-copy mt-3" style={{ marginBottom: 0 }}>
+                Backups are created nightly by the <span className="mono">attendance-backup.timer</span> on the
+                server — the health email probe hits <span className="mono">/api/health</span> every 5 minutes.
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

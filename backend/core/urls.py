@@ -3,6 +3,8 @@ from django.urls import path
 from . import portal_views, views
 
 urlpatterns = [
+    # Health / monitoring
+    path("health", views.health_view),
     # Auth
     path("auth/login", views.login_view),
     path("auth/register", views.register_view),
@@ -22,6 +24,7 @@ urlpatterns = [
     path("my_assignments", views.my_assignments_view),
     path("admin/overview", views.admin_overview_view),
     path("admin/system_stats", views.admin_system_stats_view),
+    path("admin/system_health", views.admin_system_health_view),
     path("admin/settings", views.admin_settings_view),
     path("admin/settings/update", views.admin_update_settings_view),
     path("admin/audit", views.admin_audit_view),

@@ -675,3 +675,50 @@ class AdminManagementTests(TestCase):
         self.assertEqual(res.data["students"], 1)
         self.assertIn("per_teacher", res.data)
         self.assertIn("per_class", res.data)
+
+    def test_system_health_shape(self):
+        res = self.client.get("/api/admin/system_health")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("database", res.data)
+        self.assertIn("model", res.data)
+        self.assertIn("dataset", res.data)
+        self.assertIn("train_status", res.data)
+        self.assertIn("backup", res.data)
+
+
+class SecurityHeadersTests(TestCase):
+    """CSP and transport-security headers (see core/middleware.py, settings.py)."""
+
+    def _probe(self):
+        # Login endpoint is public; a bad payload still returns full headers.
+        return self.client.post("/api/auth/login", {}, format="json")
+
+    def test_csp_off_by_default(self):
+        res = self._probe()
+        self.assertNotIn("Content-Security-Policy", res.headers)
+
+    @override_settings(CSP_ENABLED=True)
+    def test_csp_present_when_enabled(self):
+        res = self._probe()
+        csp = res.headers["Content-Security-Policy"]
+        self.assertIn("script-src 'self'", csp)
+        self.assertIn("frame-ancestors 'none'", csp)
+        self.assertIn("object-src 'none'", csp)
+
+    def test_hardening_headers_always_present(self):
+        res = self._probe()
+        self.assertEqual(res.headers.get("X-Content-Type-Options"), "nosniff")
+        self.assertEqual(res.headers.get("X-Frame-Options"), "DENY")
+        self.assertEqual(
+            res.headers.get("Referrer-Policy"), "strict-origin-when-cross-origin"
+        )
+
+
+class HealthEndpointTests(TestCase):
+    """Public monitoring probe."""
+
+    def test_health_returns_200_without_auth(self):
+        res = self.client.get("/api/health")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["status"], "ok")
+        self.assertEqual(res.data["database"], "ok")
