@@ -5,6 +5,8 @@ from . import portal_views, views
 urlpatterns = [
     # Health / monitoring
     path("health", views.health_view),
+    # Public landing stats
+    path("landing_stats", views.landing_stats_view),
     # Auth
     path("auth/login", views.login_view),
     path("auth/register", views.register_view),

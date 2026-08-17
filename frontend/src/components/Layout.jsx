@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { useAuth } from "../auth";
 import Brand from "./Brand";
 
-export default function Layout() {
+export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -95,6 +95,7 @@ export default function Layout() {
         </div>
       </nav>
       <Outlet />
+      {children}
     </>
   );
 }

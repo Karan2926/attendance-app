@@ -722,3 +722,9 @@ class HealthEndpointTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["status"], "ok")
         self.assertEqual(res.data["database"], "ok")
+
+    def test_landing_stats_public_and_shape(self):
+        res = self.client.get("/api/landing_stats")
+        self.assertEqual(res.status_code, 200)
+        for key in ("students", "classes", "subjects", "attendance_today", "embeddings", "dataset_mb"):
+            self.assertIn(key, res.data)

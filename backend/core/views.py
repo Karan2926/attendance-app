@@ -67,6 +67,25 @@ def health_view(request):
     )
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def landing_stats_view(request):
+    """Public, marketing-level counts for the landing page (no PII)."""
+    from .recognition import dataset_disk_usage
+
+    today = datetime.date.today().isoformat()
+    return Response(
+        {
+            "students": Student.objects.count(),
+            "classes": SchoolClass.objects.count(),
+            "subjects": Subject.objects.count(),
+            "attendance_today": Attendance.objects.filter(attendance_day=today).count(),
+            "embeddings": services.face_embedding_count(),
+            "dataset_mb": dataset_disk_usage(settings.DATASET_DIR)["mb"],
+        }
+    )
+
+
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------

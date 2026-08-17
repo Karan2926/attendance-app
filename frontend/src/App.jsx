@@ -1,6 +1,7 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth";
 import Layout from "./components/Layout";
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -44,9 +45,33 @@ function RequireRole({ roles, children }) {
   return children;
 }
 
+// Landing page for visitors; dashboard (in the app layout) for signed-in users.
+function HomeGate() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="page" style={{ textAlign: "center", paddingTop: "6rem" }}>
+        <div className="mono" style={{ color: "var(--ink-soft)" }}>
+          Loading…
+        </div>
+      </div>
+    );
+  }
+  if (user) {
+    return (
+      <Layout>
+        <Dashboard />
+      </Layout>
+    );
+  }
+  return <Landing />;
+}
+
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<HomeGate />} />
+
       <Route
         path="/login"
         element={
@@ -66,7 +91,6 @@ export default function App() {
 
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
           <Route
             path="/my_attendance"
             element={
