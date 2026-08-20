@@ -149,7 +149,7 @@ PASSWORD_HASHERS = [
 # ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        "core.auth.TokenCookieAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -160,6 +160,13 @@ REST_FRAMEWORK = {
     ],
     "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
 }
+
+# Auth token cookie (HttpOnly, replaces localStorage token storage).
+# The SPA gets its token only via this cookie; it is never exposed to JS.
+AUTH_COOKIE_NAME = os.environ.get("AUTH_COOKIE_NAME", "attendance_token")
+AUTH_COOKIE_MAX_AGE = int(os.environ.get("AUTH_COOKIE_MAX_AGE", "28800"))  # seconds (8h)
+# Set AUTH_COOKIE_SECURE=1 behind HTTPS in production.
+AUTH_COOKIE_SECURE = os.environ.get("AUTH_COOKIE_SECURE", "0") == "1"
 
 CORS_ALLOWED_ORIGINS = [
     o.strip()

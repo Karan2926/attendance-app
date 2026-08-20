@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, setToken } from "../api";
+import { api } from "../api";
 import usePageTitle from "../components/usePageTitle";
 import Brand from "../components/Brand";
 
@@ -24,7 +24,6 @@ export default function Register() {
         username: username.trim(),
         password,
       });
-      setToken(data.token);
       navigate("/my_attendance");
     } catch (err) {
       setError(err.message);

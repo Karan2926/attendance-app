@@ -6,8 +6,6 @@ import { useAuth } from "./auth";
 import { ToastProvider } from "./components/Toast";
 
 vi.mock("../api", () => ({
-  getToken: vi.fn(() => null),
-  setToken: vi.fn(),
   logout: vi.fn(),
   fetchMe: vi.fn(),
   login: vi.fn(),

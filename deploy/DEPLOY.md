@@ -241,7 +241,12 @@ certbot will obtain the cert and add the ssl lines to the nginx site automatical
 curl -I https://yourdomain.com/            # expect 200, HTML
 curl -s https://yourdomain.com/api/auth/login -X POST \
      -H 'Content-Type: application/json' \
-     -d '{"username":"admin","password":"YOURPW"}'   # expect token
+     -d '{"username":"admin","password":"YOURPW"}'   # expect {"user":{...}}
+# Auth is an HttpOnly cookie now — a successful login also sets the
+# `attendance_token` cookie on the response (visible with curl -i).
+curl -i https://yourdomain.com/api/auth/login -X POST \
+     -H 'Content-Type: application/json' \
+     -d '{"username":"admin","password":"YOURPW"}' | grep -i set-cookie
 sudo journalctl -u attendance -f          # live backend logs
 ```
 

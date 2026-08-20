@@ -6,10 +6,23 @@
     <title>ITM University · Digital Attendance</title>
     <meta name="description" content="Face-recognition attendance system for ITM University." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap"
+    />
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
     />
+    <style>
+      /* Mitigate the FOIT flash: fall back to a visually close stack until
+         the real family loads, then swap it in. */
+      html {
+        font-family: "Inter", "Segoe UI", sans-serif;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

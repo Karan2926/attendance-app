@@ -6,8 +6,6 @@ import Login from "./Login";
 import { AuthProvider } from "../auth";
 
 vi.mock("../api", () => ({
-  getToken: vi.fn(() => null),
-  setToken: vi.fn(),
   logout: vi.fn(),
   fetchMe: vi.fn(),
   login: vi.fn(),
@@ -36,7 +34,7 @@ describe("Login", () => {
   });
 
   it("logs in a teacher and navigates to the dashboard", async () => {
-    apiLogin.mockResolvedValue({ token: "tok123", user: { role: "teacher", username: "proff" } });
+    apiLogin.mockResolvedValue({ user: { role: "teacher", username: "proff" } });
     const user = userEvent.setup();
     renderLogin();
 
@@ -49,7 +47,7 @@ describe("Login", () => {
   });
 
   it("routes students to My Attendance", async () => {
-    apiLogin.mockResolvedValue({ token: "tok456", user: { role: "student", username: "stu1" } });
+    apiLogin.mockResolvedValue({ user: { role: "student", username: "stu1" } });
     const user = userEvent.setup();
     renderLogin();
 

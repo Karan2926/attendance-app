@@ -4,15 +4,13 @@ import { api, postFormData } from "../api";
 import usePageTitle from "../components/usePageTitle";
 import { captureBlob, useCamera } from "../components/useCamera";
 
-const POSES = [
-  ["Look straight at the camera", 8],
-  ["Turn your head slightly LEFT", 8],
-  ["Turn your head slightly RIGHT", 8],
-  ["Tilt your chin up a little", 8],
-  ["Tilt your chin down a little", 8],
-  ["Smile naturally", 8],
+const PHASES = [
+  ["Face the camera", 4],
+  ["Slowly turn your head side to side", 8],
 ];
-const MAX_IMAGES = POSES.reduce((sum, p) => sum + p[1], 0);
+const QUICK_CAPTURES = PHASES.reduce((sum, p) => sum + p[1], 0);
+
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default function AddStudent() {
 
@@ -75,31 +73,31 @@ export default function AddStudent() {
     }
   }
 
-  async function runGuidedCapture() {
+  async function runQuickCapture() {
     setStartCapture(true);
-    let total = 0;
     const collected = [];
-    for (const [instruction, count] of POSES) {
-      setPose(instruction);
-      await new Promise((r) => setTimeout(r, 1200));
-      let forPose = 0;
+    for (const [msg, count] of PHASES) {
+      setPose(msg);
+      await delay(900);
+      let forPhase = 0;
       let attempts = 0;
-      while (forPose < count && attempts < count * 4) {
+      while (forPhase < count && attempts < count * 4) {
         attempts++;
         const blob = await captureBlob(videoRef.current);
         const q = await checkQuality(blob);
         if (q.ok) {
           collected.push(blob);
-          forPose++;
-          total++;
+          forPhase++;
           setCornerColor("#0EA5A4");
-          setCaptured(total);
-          setStatus(`Captured ${total} / ${MAX_IMAGES}`);
+          setCaptured(collected.length);
+          setStatus(`Captured ${collected.length} / ${QUICK_CAPTURES}`);
         } else {
           setCornerColor("#EF4444");
-          setStatus(`${q.reason || "Adjust position"}... (${total} / ${MAX_IMAGES})`);
+          setStatus(
+            `${q.reason || "Keep your face in the frame"}… (${collected.length} / ${QUICK_CAPTURES})`
+          );
         }
-        await new Promise((r) => setTimeout(r, 350));
+        await delay(300);
       }
     }
     setPose("Done!");
@@ -110,7 +108,9 @@ export default function AddStudent() {
     collected.forEach((b, i) => form.append("images[]", b, `img_${i}.jpg`));
     try {
       await postFormData(`/students/${studentId}/upload_face`, form);
-      setStatus(`Captured and uploaded ${collected.length} quality photos across multiple angles.`);
+      setStatus(
+        `Captured and uploaded ${collected.length} quality photos (front and side angles).`
+      );
       stop();
       setStartCapture(false);
     } catch {
@@ -125,7 +125,7 @@ export default function AddStudent() {
     }
     try {
       await start();
-      runGuidedCapture();
+      runQuickCapture();
     } catch {
       alert("Camera access error");
     }
@@ -157,7 +157,7 @@ export default function AddStudent() {
         <div className={`step-chip ${studentId && !images ? "active" : ""}`}>
           <span className="n">2</span> Capture faces
         </div>
-        <div className={`step-chip ${captured >= MAX_IMAGES ? "active" : ""}`}>
+        <div className={`step-chip ${captured >= QUICK_CAPTURES ? "active" : ""}`}>
           <span className="n">3</span> Finish
         </div>
       </div>
@@ -167,8 +167,8 @@ export default function AddStudent() {
           <span className="eyebrow">Student details</span>
           <h2 className="panel-title">Who are we enrolling?</h2>
           <p className="panel-copy">
-            Save info first, then capture guided poses so recognition stays accurate in large
-            classes.
+            Save info first, then capture a few quality photos so recognition stays accurate in
+            large classes.
           </p>
 
           <form onSubmit={saveInfo}>
@@ -230,7 +230,7 @@ export default function AddStudent() {
                 onClick={startCaptureFlow}
                 disabled={!canCapture || startCapture}
               >
-                {startCapture ? "Capturing…" : `Start Capture (${MAX_IMAGES})`}
+                {startCapture ? "Capturing…" : `Start Capture (${QUICK_CAPTURES})`}
               </button>
               <button
                 type="button"
@@ -253,7 +253,9 @@ export default function AddStudent() {
           <span className="eyebrow">Face capture</span>
           <h2 className="panel-title">Camera stage</h2>
           <p className="panel-copy">
-            Follow on-screen poses. Quality checks run before each frame is kept.
+            Two short steps — face the camera, then slowly turn your head side to side.
+            Good frames are captured and quality-checked automatically, keeping extra pose
+            variety for accuracy without the long routine.
           </p>
 
           <div className="scan-stage" style={{ position: "relative" }}>
@@ -294,10 +296,10 @@ export default function AddStudent() {
               {pose || "Waiting for capture…"}
             </div>
             <div className="mono mt-1" style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-              Captured {captured} / {MAX_IMAGES}
+              Captured {captured} / {QUICK_CAPTURES}
             </div>
             <div className="progress2 mt-2">
-              <div className="progress2-bar" style={{ width: `${(captured / MAX_IMAGES) * 100}%` }} />
+              <div className="progress2-bar" style={{ width: `${(captured / QUICK_CAPTURES) * 100}%` }} />
             </div>
           </div>
         </div>

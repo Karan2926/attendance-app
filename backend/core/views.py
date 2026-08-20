@@ -47,6 +47,13 @@ from .recognition import (
 DATASET_DIR = settings.DATASET_DIR
 os.makedirs(DATASET_DIR, exist_ok=True)
 
+
+def _client_ip(request):
+    fwd = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "") or "unknown"
+
 # ---------------------------------------------------------------------------
 # Health / monitoring
 # ---------------------------------------------------------------------------
@@ -105,13 +112,31 @@ def _user_payload(u):
 def login_view(request):
     username = (request.data.get("username") or "").strip()
     password = request.data.get("password") or ""
+    client_ip = _client_ip(request)
     from django.contrib.auth import authenticate
 
     user = authenticate(username=username, password=password)
     if not user or not user.is_active:
+        services.log_action(
+            None,
+            "auth.login.failed",
+            target=username or "(blank)",
+            detail=f"ip={client_ip}",
+        )
         return Response({"error": "Invalid username or password."}, status=400)
     token, _ = Token.objects.get_or_create(user=user)
-    return Response({"token": token.key, "user": _user_payload(user)})
+    services.log_action(user, "auth.login", target=username, detail=f"ip={client_ip}")
+    resp = Response({"user": _user_payload(user)})
+    resp.set_cookie(
+        settings.AUTH_COOKIE_NAME,
+        token.key,
+        max_age=settings.AUTH_COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="Lax",
+        secure=settings.AUTH_COOKIE_SECURE,
+        path="/",
+    )
+    return resp
 
 
 @api_view(["POST"])
@@ -153,16 +178,35 @@ def register_view(request):
         created_at=now_iso(),
     )
     token, _ = Token.objects.get_or_create(user=user)
-    return Response({"token": token.key, "user": _user_payload(user)}, status=201)
+    services.log_action(user, "auth.register", target=username)
+    resp = Response({"user": _user_payload(user)}, status=201)
+    resp.set_cookie(
+        settings.AUTH_COOKIE_NAME,
+        token.key,
+        max_age=settings.AUTH_COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="Lax",
+        secure=settings.AUTH_COOKIE_SECURE,
+        path="/",
+    )
+    return resp
 
 
 @api_view(["POST"])
 def logout_view(request):
     try:
-        request.auth.delete()
+        if request.auth is not None and hasattr(request.auth, "delete"):
+            request.auth.delete()
     except Exception:
         pass
-    return Response({"ok": True})
+    services.log_action(request.user, "auth.logout", target=request.user.username)
+    resp = Response({"ok": True})
+    resp.delete_cookie(
+        settings.AUTH_COOKIE_NAME,
+        path="/",
+        samesite="Lax",
+    )
+    return resp
 
 
 @api_view(["GET"])
@@ -1465,6 +1509,13 @@ def delete_attendance_record_view(request, record_id):
     return Response({"deleted": True})
 
 
+def _csv_safe(value):
+    s = "" if value is None else str(value)
+    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + s
+    return s
+
+
 def _download_csv_response(request):
     class_ids = services.teacher_class_ids(request.user.id, request.user.role)
     qs = Attendance.objects.select_related("school_class", "subject")
@@ -1479,13 +1530,13 @@ def _download_csv_response(request):
         writer.writerow(
             [
                 r.id,
-                r.student_id,
-                r.name,
+                _csv_safe(r.student_id),
+                _csv_safe(r.name),
                 r.timestamp,
-                r.school_class.name if r.school_class else "",
-                r.school_class.section if r.school_class else "",
-                r.subject.name if r.subject else "",
-                r.subject.code if r.subject else "",
+                _csv_safe(r.school_class.name) if r.school_class else "",
+                _csv_safe(r.school_class.section) if r.school_class else "",
+                _csv_safe(r.subject.name) if r.subject else "",
+                _csv_safe(r.subject.code) if r.subject else "",
             ]
         )
     resp = HttpResponse(output.getvalue(), content_type="text/csv")

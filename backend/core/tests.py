@@ -12,6 +12,7 @@ from rest_framework.test import APIClient
 
 from .models import (
     Attendance,
+    AuditLog,
     Enrollment,
     RoleUser,
     SchoolClass,
@@ -38,17 +39,41 @@ class AuthTests(TestCase):
     def setUp(self):
         self.client = APIClient()
 
-    def test_login_success_returns_token(self):
+    def test_login_success_sets_auth_cookie(self):
         make_user("alice", "admin", password="secret123")
         res = self.client.post("/api/auth/login", {"username": "alice", "password": "secret123"})
         self.assertEqual(res.status_code, 200)
-        self.assertIn("token", res.data)
         self.assertEqual(res.data["user"]["role"], "admin")
+        # Token must live only in the HttpOnly cookie — never in the JSON body.
+        self.assertNotIn("token", res.data)
+        self.assertIn("attendance_token", res.cookies)
+        self.assertTrue(res.cookies["attendance_token"].value)
 
     def test_login_wrong_password(self):
         make_user("alice", "admin")
         res = self.client.post("/api/auth/login", {"username": "alice", "password": "nope1234"})
         self.assertEqual(res.status_code, 400)
+
+    def test_login_failed_is_audited(self):
+        make_user("alice", "admin", password="secret123")
+        res = self.client.post("/api/auth/login", {"username": "alice", "password": "badpass"})
+        self.assertEqual(res.status_code, 400)
+        self.assertTrue(
+            AuditLog.objects.filter(action="auth.login.failed", target="alice").exists()
+        )
+
+    def test_cookie_authenticates_and_logout_clears(self):
+        make_user("dave", "teacher", password="secret123")
+        res = self.client.post("/api/auth/login", {"username": "dave", "password": "secret123"})
+        self.assertEqual(res.status_code, 200)
+        token_key = res.cookies["attendance_token"].value
+        me = self.client.get("/api/auth/me")
+        self.assertEqual(me.status_code, 200)
+        self.assertEqual(me.data["user"]["username"], "dave")
+        out = self.client.post("/api/auth/logout")
+        self.assertEqual(out.status_code, 200)
+        self.assertFalse(Token.objects.filter(key=token_key).exists())
+        self.assertEqual(self.client.get("/api/auth/me").status_code, 403)
 
     def test_me_requires_auth(self):
         res = self.client.get("/api/auth/me")
@@ -70,7 +95,8 @@ class AuthTests(TestCase):
             {"roll": "R1", "username": "samuser", "password": "longpassword"},
         )
         self.assertEqual(res.status_code, 201)
-        self.assertIn("token", res.data)
+        self.assertNotIn("token", res.data)
+        self.assertIn("attendance_token", res.cookies)
 
     def test_register_unknown_roll(self):
         res = self.client.post(
@@ -314,6 +340,20 @@ class AttendanceMarkTests(TestCase):
         self.assertIn("student_id", res.content.decode())
         self.assertIn("S1", res.content.decode())
 
+    def test_csv_escapes_formula_cells(self):
+        import datetime
+
+        Attendance.objects.create(
+            student=self.st1,
+            school_class=self.cls,
+            subject=self.subj,
+            attendance_day=datetime.date.today().isoformat(),
+            name="=SUM(A1:A9)",
+        )
+        res = self.c.get("/api/attendance_records.csv")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("'=SUM(A1:A9)", res.content.decode())
+
     def test_recognize_face_requires_class_subject(self):
         # Even with an image, missing class_id/subject_id must fail with 400
         f = io.BytesIO(b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01")
@@ -453,6 +493,23 @@ class RegisterExportTests(TestCase):
     def test_register_export_requires_params(self):
         res = self.c.get("/api/register_export.xlsx")
         self.assertEqual(res.status_code, 400)
+
+    def test_register_export_escapes_formula_names(self):
+        import datetime
+        import openpyxl
+        from .register_export import build_register_workbook
+
+        Student.objects.filter(roll="1").update(name="=SUM(C1:C9)")
+        data = build_register_workbook(
+            class_id=self.cls.id,
+            subject_id=self.subj.id,
+            year=datetime.date.today().year,
+            month=datetime.date.today().month,
+        )
+        wb = openpyxl.load_workbook(io.BytesIO(data))
+        ws = wb["Monthly Register"]
+        values = [c.value for row in ws.iter_rows() for c in row]
+        self.assertIn("'=SUM(C1:C9)", values)
 
 
 class PortalApiTests(TestCase):
@@ -704,6 +761,14 @@ class SecurityHeadersTests(TestCase):
         self.assertIn("script-src 'self'", csp)
         self.assertIn("frame-ancestors 'none'", csp)
         self.assertIn("object-src 'none'", csp)
+
+    @override_settings(CSP_ENABLED=True)
+    def test_csp_allows_google_fonts(self):
+        # The landing page loads Inter/JetBrains Mono from Google Fonts.
+        res = self._probe()
+        csp = res.headers["Content-Security-Policy"]
+        self.assertIn("https://fonts.googleapis.com", csp)
+        self.assertIn("https://fonts.gstatic.com", csp)
 
     def test_hardening_headers_always_present(self):
         res = self._probe()

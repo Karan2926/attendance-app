@@ -29,6 +29,13 @@ def _thin():
     )
 
 
+def _safe_text(value):
+    s = "" if value is None else str(value)
+    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + s
+    return s
+
+
 def build_register_workbook(
     *,
     class_id: int,
@@ -70,8 +77,9 @@ def build_register_workbook(
     class_display = class_name + (f" — Sec {section}" if section else "")
     subject_name = srow.name or ""
     subject_code = srow.code or ""
-    session_label = session_label or (crow.academic_year or f"{year}-{str(year + 1)[-2:]}")
-    branch_label = branch_label or class_name
+    session_label = _safe_text(session_label) or (crow.academic_year or f"{year}-{str(year + 1)[-2:]}")
+    branch_label = _safe_text(branch_label) or class_name
+    faculty_name = _safe_text(faculty_name)
 
     wb = Workbook()
 
@@ -179,8 +187,8 @@ def build_register_workbook(
     for idx, st in enumerate(students, start=1):
         row = data_start + idx - 1
         sid = int(st.id)
-        roll = st.roll or ""
-        name = st.name or ""
+        roll = _safe_text(st.roll or "")
+        name = _safe_text(st.name or "")
 
         values = [idx, roll, name]
         for col, val in enumerate(values, start=1):

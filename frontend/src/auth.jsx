@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { fetchMe, getToken, login as apiLogin, logout as apiLogout, setToken } from "./api";
+import { fetchMe, login as apiLogin, logout as apiLogout } from "./api";
 
 const AuthContext = createContext(null);
 
@@ -10,15 +10,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let active = true;
     (async () => {
-      if (!getToken()) {
-        setLoading(false);
-        return;
-      }
       try {
         const data = await fetchMe();
         if (active) setUser(data.user);
       } catch {
-        setToken(null);
+        // no/expired session — stays logged out
       } finally {
         if (active) setLoading(false);
       }
@@ -30,7 +26,6 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password) => {
     const data = await apiLogin(username, password);
-    setToken(data.token);
     setUser(data.user);
     return data.user;
   }, []);
@@ -41,7 +36,6 @@ export function AuthProvider({ children }) {
     } catch {
       // ignore
     }
-    setToken(null);
     setUser(null);
   }, []);
 

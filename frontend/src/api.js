@@ -1,23 +1,11 @@
 // API client — talks to the Django backend.
 // In dev, Vite proxies /api to the backend (see vite.config.js).
 // In production, set VITE_API_BASE to the full backend origin.
+// Auth uses an HttpOnly cookie set by the backend — no token storage here.
 const BASE = import.meta.env.VITE_API_BASE || "";
-
-const TOKEN_KEY = "attendance_token";
-
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
-}
 
 async function request(path, options = {}) {
   const headers = new Headers(options.headers || {});
-  const token = getToken();
-  if (token) headers.set("Authorization", `Token ${token}`);
 
   // Build the body: stringify plain objects as JSON (fetch does NOT do this
   // automatically — it would send "[object Object]" and break the API).
@@ -28,9 +16,6 @@ async function request(path, options = {}) {
   }
 
   const res = await fetch(`${BASE}/api${path}`, { ...options, body, headers });
-  if (res.status === 401) {
-    setToken(null);
-  }
   const ct = res.headers.get("content-type") || "";
   const text = await res.text();
   let data = null;
@@ -71,10 +56,7 @@ export async function postFormData(path, formData) {
 }
 
 export async function downloadBlob(path, filename) {
-  const headers = new Headers();
-  const token = getToken();
-  if (token) headers.set("Authorization", `Token ${token}`);
-  const res = await fetch(`${BASE}/api${path}`, { headers });
+  const res = await fetch(`${BASE}/api${path}`);
   if (!res.ok) throw new Error(`Download failed (${res.status})`);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
