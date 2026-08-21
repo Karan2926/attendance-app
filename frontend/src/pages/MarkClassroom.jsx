@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, postFormData } from "../api";
 import usePageTitle from "../components/usePageTitle";
-import { captureBlob, useCamera } from "../components/useCamera";
+import { captureBlob, resizeImageBlob, useCamera } from "../components/useCamera";
 import ClassSubjectSelector from "../components/ClassSubjectSelector";
 
 const STRONG_MATCH = 0.32;
@@ -87,10 +87,11 @@ export default function MarkClassroom() {
     setStatus(`${blobs.length + 1} photo(s) ready. Capture more or click "Analyze Photo".`);
   }
 
-  function onFiles(e) {
+  async function onFiles(e) {
     const files = Array.from(e.target.files || []);
-    setBlobs((prev) => [...prev, ...files]);
-    setStatus(`${blobs.length + files.length} photo(s) ready. Capture more or click "Analyze Photo".`);
+    const resized = await Promise.all(files.map((f) => resizeImageBlob(f)));
+    setBlobs((prev) => [...prev, ...resized]);
+    setStatus(`${blobs.length + resized.length} photo(s) ready. Capture more or click "Analyze Photo".`);
   }
 
   async function analyze() {

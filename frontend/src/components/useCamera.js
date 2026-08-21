@@ -53,13 +53,42 @@ export function useCamera(onFrame, { width = 640, height = 480 } = {}) {
   return { videoRef, live, start, stop, error };
 }
 
-export function captureBlob(video) {
+export function resizeImageBlob(blob, { maxDim = 1280, quality = 0.85 } = {}) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let w = img.width;
+      let h = img.height;
+      if (Math.max(w, h) > maxDim) {
+        const ratio = maxDim / Math.max(w, h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      canvas.toBlob(resolve, "image/jpeg", quality);
+    };
+    img.onerror = () => resolve(blob);
+    img.src = URL.createObjectURL(blob);
+  });
+}
+
+export function captureBlob(video, { maxDim = 1280, quality = 0.85 } = {}) {
   return new Promise((resolve) => {
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    let w = video.videoWidth || 640;
+    let h = video.videoHeight || 480;
+    if (Math.max(w, h) > maxDim) {
+      const ratio = maxDim / Math.max(w, h);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+    }
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(resolve, "image/jpeg", 0.9);
+    ctx.drawImage(video, 0, 0, w, h);
+    canvas.toBlob(resolve, "image/jpeg", quality);
   });
 }

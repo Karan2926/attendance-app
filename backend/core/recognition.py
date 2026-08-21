@@ -223,7 +223,7 @@ def _reembed_upscaled_crop(img, bbox, min_face_side: int = 160):
     return np.asarray(faces[0].normed_embedding, dtype=np.float32)
 
 
-def _iter_classroom_tiles(img, grid_rows: int = 2, grid_cols: int = 3, overlap: float = 0.25):
+def _iter_classroom_tiles(img, grid_rows: int = 2, grid_cols: int = 2, overlap: float = 0.25):
     import cv2
 
     h, w = img.shape[:2]
@@ -290,7 +290,8 @@ def extract_embeddings_for_classroom(stream_or_bytes, min_face_px: int = 14):
             )
 
     long_edge = max(orig_h, orig_w)
-    full_targets = sorted({long_edge, max(long_edge, 2000), max(long_edge, 2800)})
+    upscale_target = min(max(long_edge, 1600), 2000)
+    full_targets = sorted({long_edge, upscale_target})
     for te in full_targets:
         if te == long_edge:
             scaled, scale = working, 1.0
