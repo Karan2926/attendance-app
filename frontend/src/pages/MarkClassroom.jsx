@@ -102,7 +102,7 @@ export default function MarkClassroom() {
 
   const handleSessionSelect = useCallback((s) => setSession(s), []);
 
-  const { videoRef, live, start, stop, error, facingMode, flipCamera, hasMultipleCameras } = useCamera(
+  const { videoRef, attachVideo, live, start, stop, error, facingMode, flipCamera, hasMultipleCameras } = useCamera(
     () => {},
     { width: 1920, height: 1080, defaultFacing: "environment" }
   );
@@ -329,7 +329,7 @@ export default function MarkClassroom() {
             <div className="mb-3">
               <div className="scan-stage is-live" style={{ minHeight: "240px" }}>
                 <video
-                  ref={videoRef}
+                  ref={attachVideo}
                   autoPlay
                   muted
                   playsInline

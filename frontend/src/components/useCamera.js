@@ -96,13 +96,23 @@ export function useCamera(onFrame, { width = 1280, height = 720, defaultFacing =
     [width, height, facingMode, stop]
   );
 
-  // Guarantee stream is attached to video element when DOM element mounts
+  // Callback ref and effect to guarantee stream is attached immediately when <video> mounts
+  const attachVideo = useCallback((node) => {
+    videoRef.current = node;
+    if (node && streamRef.current) {
+      if (node.srcObject !== streamRef.current) {
+        node.srcObject = streamRef.current;
+      }
+      node.play().catch(() => {});
+    }
+  }, []);
+
   useEffect(() => {
     if (live && streamRef.current && videoRef.current) {
       if (videoRef.current.srcObject !== streamRef.current) {
         videoRef.current.srcObject = streamRef.current;
-        videoRef.current.play().catch(() => {});
       }
+      videoRef.current.play().catch(() => {});
     }
   }, [live]);
 
@@ -114,7 +124,7 @@ export function useCamera(onFrame, { width = 1280, height = 720, defaultFacing =
 
   useEffect(() => stop, [stop]);
 
-  return { videoRef, live, start, stop, error, facingMode, flipCamera, hasMultipleCameras };
+  return { videoRef, attachVideo, live, start, stop, error, facingMode, flipCamera, hasMultipleCameras };
 }
 
 export function resizeImageBlob(blob, { maxDim = 1280, quality = 0.85 } = {}) {
