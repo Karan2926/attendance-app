@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // Lightweight webcam helper for guided face capture and live marking.
-export function useCamera(onFrame, { width = 640, height = 480 } = {}) {
+export function useCamera(onFrame, { width = 1280, height = 720, defaultFacing = "user" } = {}) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
@@ -9,6 +9,24 @@ export function useCamera(onFrame, { width = 640, height = 480 } = {}) {
   frameCbRef.current = onFrame;
   const [live, setLive] = useState(false);
   const [error, setError] = useState("");
+  const [facingMode, setFacingMode] = useState(defaultFacing); // "user" | "environment"
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
+
+  // Check available cameras
+  useEffect(() => {
+    async function checkCameras() {
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter((d) => d.kind === "videoinput");
+          setHasMultipleCameras(videoDevices.length > 1);
+        }
+      } catch {
+        // ignore device enum errors
+      }
+    }
+    checkCameras();
+  }, []);
 
   const stop = useCallback(() => {
     if (intervalRef.current) {
@@ -19,38 +37,84 @@ export function useCamera(onFrame, { width = 640, height = 480 } = {}) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
-    if (videoRef.current) videoRef.current.srcObject = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     setLive(false);
   }, []);
 
   const start = useCallback(
-    async (intervalMs) => {
+    async (intervalMs, overrideMode) => {
+      stop();
+      const mode = overrideMode || facingMode;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width, height },
-        });
+        const constraints = {
+          video: {
+            width: { ideal: width },
+            height: { ideal: height },
+            ...(mode ? { facingMode: { ideal: mode } } : {}),
+          },
+          audio: false,
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
         setError("");
         setLive(true);
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+
         if (intervalMs) {
           intervalRef.current = setInterval(() => {
-            if (videoRef.current) frameCbRef.current(videoRef.current);
+            if (videoRef.current && videoRef.current.readyState >= 2) {
+              frameCbRef.current(videoRef.current);
+            }
           }, intervalMs);
         }
       } catch (err) {
-        setError(err.message || "Camera access denied");
+        // If ideal facingMode failed, try fallback without facingMode
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: width }, height: { ideal: height } },
+            audio: false,
+          });
+          streamRef.current = fallbackStream;
+          setError("");
+          setLive(true);
+          if (videoRef.current) {
+            videoRef.current.srcObject = fallbackStream;
+            videoRef.current.play().catch(() => {});
+          }
+        } catch (fallbackErr) {
+          setError(err.message || fallbackErr.message || "Camera access denied");
+          setLive(false);
+        }
       }
     },
-    [width, height]
+    [width, height, facingMode, stop]
   );
+
+  // Guarantee stream is attached to video element when DOM element mounts
+  useEffect(() => {
+    if (live && streamRef.current && videoRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  }, [live]);
+
+  const flipCamera = useCallback(async () => {
+    const nextMode = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(nextMode);
+    await start(intervalRef.current ? 500 : 0, nextMode);
+  }, [facingMode, start]);
 
   useEffect(() => stop, [stop]);
 
-  return { videoRef, live, start, stop, error };
+  return { videoRef, live, start, stop, error, facingMode, flipCamera, hasMultipleCameras };
 }
 
 export function resizeImageBlob(blob, { maxDim = 1280, quality = 0.85 } = {}) {

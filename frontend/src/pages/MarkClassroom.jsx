@@ -102,7 +102,10 @@ export default function MarkClassroom() {
 
   const handleSessionSelect = useCallback((s) => setSession(s), []);
 
-  const { videoRef, live, start, stop, error } = useCamera(() => {}, { width: 1280, height: 720 });
+  const { videoRef, live, start, stop, error, facingMode, flipCamera, hasMultipleCameras } = useCamera(
+    () => {},
+    { width: 1920, height: 1080, defaultFacing: "environment" }
+  );
 
   useEffect(() => () => stop(), [stop]);
 
@@ -340,7 +343,15 @@ export default function MarkClassroom() {
               </div>
               <div className="d-flex gap-2 mt-2 flex-wrap">
                 <button className="btn2 btn2-teal" onClick={onCapture}>
-                  Capture Photo
+                  📸 Capture Photo
+                </button>
+                <button
+                  className="btn2 btn2-outline"
+                  type="button"
+                  onClick={flipCamera}
+                  title="Switch between front and back cameras"
+                >
+                  🔄 Flip ({facingMode === "environment" ? "Back" : "Front"})
                 </button>
                 <button className="btn2 btn2-outline" onClick={stop}>
                   Close Camera
