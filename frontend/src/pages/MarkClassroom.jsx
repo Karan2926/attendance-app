@@ -5,7 +5,7 @@ import usePageTitle from "../components/usePageTitle";
 import { captureBlob, resizeImageBlob, useCamera } from "../components/useCamera";
 import ClassSubjectSelector from "../components/ClassSubjectSelector";
 
-const STRONG_MATCH = 0.32;
+const STRONG_MATCH = 0.44;
 
 function reviewInfo(face) {
   if (!face.recognized) return { label: "Unknown — skip", needsReview: true };
@@ -185,7 +185,9 @@ export default function MarkClassroom() {
     const detected = [...merged.values(), ...unknowns];
     const initChecked = {};
     detected.forEach((f) => {
-      if (f.recognized && !f.already_marked) initChecked[f.student_id] = true;
+      if (f.recognized && !f.already_marked && !f.needs_review && (f.confidence || 0) >= STRONG_MATCH) {
+        initChecked[f.student_id] = true;
+      }
     });
     setFaces(detected);
     setPreviewFaces(firstFaces);

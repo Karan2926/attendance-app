@@ -19,11 +19,11 @@ MODEL_PATH = settings.MODEL_PATH
 CACHE_PATH = os.path.join(settings.BASE_DIR, "embedding_cache.pkl")
 DATASET_DIR = settings.DATASET_DIR
 
-LIVE_SIM_THRESHOLD = 0.34
-CLASSROOM_SIM_THRESHOLD = 0.28
-CLASSROOM_STRONG_THRESHOLD = 0.32
-MARGIN = 0.03
-CLASSROOM_MARGIN = 0.02
+LIVE_SIM_THRESHOLD = 0.40
+CLASSROOM_SIM_THRESHOLD = 0.38
+CLASSROOM_STRONG_THRESHOLD = 0.44
+MARGIN = 0.05
+CLASSROOM_MARGIN = 0.04
 # Absolute ceiling for decoded bitmaps (see _decode_image). Higher than the
 # upload limit because legitimate classroom shots are large, but still stops
 # decompression-bomb OOMs.

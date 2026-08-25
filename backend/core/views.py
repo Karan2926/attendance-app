@@ -1341,8 +1341,6 @@ def recognize_classroom_view(request):
             "recognition.classroom_strong_threshold", CLASSROOM_STRONG_THRESHOLD
         )
         margin = _effective_setting("recognition.classroom_margin", CLASSROOM_MARGIN)
-        if len(enrolled) <= 5:
-            sim_thr = min(sim_thr, 0.25)
 
         today = datetime.date.today().isoformat()
         results_list = []
