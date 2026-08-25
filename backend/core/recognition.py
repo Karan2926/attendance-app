@@ -91,11 +91,8 @@ def get_face_app(det_size: tuple[int, int] = (640, 640)):
 
     key = (int(det_size[0]), int(det_size[1]))
     if key not in _face_apps:
-        app = FaceAnalysis(name="buffalo_l")
-        try:
-            app.prepare(ctx_id=0, det_size=key)
-        except Exception:
-            app.prepare(ctx_id=-1, det_size=key)
+        app = FaceAnalysis(name="buffalo_l", allowed_modules=["detection", "recognition"])
+        app.prepare(ctx_id=-1, det_size=key)
         _face_apps[key] = app
     return _face_apps[key]
 
@@ -223,7 +220,7 @@ def _reembed_upscaled_crop(img, bbox, min_face_side: int = 160):
     return np.asarray(faces[0].normed_embedding, dtype=np.float32)
 
 
-def _iter_classroom_tiles(img, grid_rows: int = 2, grid_cols: int = 2, overlap: float = 0.25):
+def _iter_classroom_tiles(img, grid_rows: int = 2, grid_cols: int = 2, overlap: float = 0.15):
     import cv2
 
     h, w = img.shape[:2]
@@ -246,14 +243,14 @@ def _iter_classroom_tiles(img, grid_rows: int = 2, grid_cols: int = 2, overlap: 
                 break
             tile = img[y1:y2, x1:x2]
             th, tw = tile.shape[:2]
-            target = 1000
+            target = 800
             long_edge = max(th, tw)
             scale = target / long_edge if long_edge < target else 1.0
             if scale != 1.0:
                 tile = cv2.resize(
                     tile,
                     (int(tw * scale), int(th * scale)),
-                    interpolation=cv2.INTER_CUBIC,
+                    interpolation=cv2.INTER_LINEAR,
                 )
             yield x1, y1, tile, scale
             if x2 >= w:
@@ -265,14 +262,34 @@ def _iter_classroom_tiles(img, grid_rows: int = 2, grid_cols: int = 2, overlap: 
 
 
 def extract_embeddings_for_classroom(stream_or_bytes, min_face_px: int = 14):
+    import time
     import cv2
+    import logging
+
+    logger = logging.getLogger("core.recognition")
+    t_start = time.perf_counter()
 
     img = _decode_image(stream_or_bytes)
     if img is None:
         return []
 
     orig_h, orig_w = img.shape[:2]
-    working = _enhance_classroom_image(img)
+    long_edge = max(orig_h, orig_w)
+
+    # 1. Normalize working resolution to avoid processing excessively huge images (e.g. 4000px+)
+    target_max = 1600
+    if long_edge > target_max:
+        scale_down = target_max / long_edge
+        working_img = cv2.resize(
+            img,
+            (int(orig_w * scale_down), int(orig_h * scale_down)),
+            interpolation=cv2.INTER_AREA,
+        )
+    else:
+        scale_down = 1.0
+        working_img = img
+
+    working = _enhance_classroom_image(working_img)
     raw_faces = []
 
     def _add_faces(faces, ox=0.0, oy=0.0, scale=1.0):
@@ -281,6 +298,9 @@ def extract_embeddings_for_classroom(stream_or_bytes, min_face_px: int = 14):
             if scale != 1.0:
                 x1, y1, x2, y2 = x1 / scale, y1 / scale, x2 / scale, y2 / scale
             x1, y1, x2, y2 = x1 + ox, y1 + oy, x2 + ox, y2 + oy
+            # Map back to original image coordinate space if working_img was scaled down
+            if scale_down != 1.0:
+                x1, y1, x2, y2 = x1 / scale_down, y1 / scale_down, x2 / scale_down, y2 / scale_down
             raw_faces.append(
                 {
                     "bbox": [x1, y1, x2, y2],
@@ -289,38 +309,33 @@ def extract_embeddings_for_classroom(stream_or_bytes, min_face_px: int = 14):
                 }
             )
 
-    long_edge = max(orig_h, orig_w)
-    upscale_target = min(max(long_edge, 1600), 2000)
-    full_targets = sorted({long_edge, upscale_target})
-    for te in full_targets:
-        if te == long_edge:
-            scaled, scale = working, 1.0
-        else:
-            scale = te / long_edge
-            scaled = cv2.resize(
-                working,
-                (int(orig_w * scale), int(orig_h * scale)),
-                interpolation=cv2.INTER_CUBIC,
-            )
-        for det_size in ((960, 960), (1280, 1280)):
-            if max(scaled.shape[:2]) >= 2600 and det_size[0] >= 1280:
-                continue
-            try:
-                _add_faces(get_face_app(det_size).get(scaled), scale=scale)
-            except Exception:
-                continue
+    # 2. Single full-image pass at (640, 640) to detect all prominent and middle-ground faces
+    t_full_start = time.perf_counter()
+    try:
+        full_faces = get_face_app((640, 640)).get(working)
+        _add_faces(full_faces, scale=1.0)
+    except Exception as e:
+        logger.warning(f"Full-image detection pass failed: {e}")
+    t_full_done = time.perf_counter()
 
-    for x0, y0, tile, tile_scale in _iter_classroom_tiles(working):
+    # 3. 2x2 grid tile passes (4 tiles) at (640, 640) for high-detail detection of back-row students
+    t_tile_start = time.perf_counter()
+    tile_count = 0
+    for x0, y0, tile, tile_scale in _iter_classroom_tiles(working, grid_rows=2, grid_cols=2, overlap=0.15):
+        tile_count += 1
         try:
+            tile_faces = get_face_app((640, 640)).get(tile)
             _add_faces(
-                get_face_app((640, 640)).get(tile),
+                tile_faces,
                 ox=float(x0),
                 oy=float(y0),
                 scale=tile_scale,
             )
         except Exception:
             continue
+    t_tile_done = time.perf_counter()
 
+    # 4. Non-Maximum Suppression (NMS) to merge duplicate detections across full pass & tiles
     raw_faces.sort(key=lambda x: x["det_score"], reverse=True)
     kept = []
     for face in raw_faces:
@@ -334,20 +349,19 @@ def extract_embeddings_for_classroom(stream_or_bytes, min_face_px: int = 14):
 
     results = []
     for f in kept:
-        bbox = f["bbox"]
-        fw, fh = bbox[2] - bbox[0], bbox[3] - bbox[1]
-        emb = f["embedding"]
-        if min(fw, fh) < 90:
-            better = _reembed_upscaled_crop(working, bbox)
-            if better is not None:
-                emb = better
         results.append(
             {
-                "bbox": [int(v) for v in bbox],
-                "embedding": emb,
+                "bbox": [int(v) for v in f["bbox"]],
+                "embedding": f["embedding"],
                 "det_score": f["det_score"],
             }
         )
+
+    t_total = time.perf_counter() - t_start
+    print(
+        f"[Classroom Inference] Detected {len(results)} faces in {t_total:.2f}s "
+        f"(Full pass: {t_full_done - t_full_start:.2f}s, {tile_count} Tiles: {t_tile_done - t_tile_start:.2f}s)"
+    )
     return results
 
 

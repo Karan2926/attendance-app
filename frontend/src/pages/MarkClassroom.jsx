@@ -48,6 +48,43 @@ function drawFaceBox(ctx, face) {
   ctx.fillText(label, x1 + padX, labelY + boxH - 6);
 }
 
+async function compressImageForUpload(fileOrBlob, maxDimension = 1920, quality = 0.85) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(fileOrBlob);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          resolve(blob || fileOrBlob);
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(fileOrBlob);
+    };
+    img.src = url;
+  });
+}
+
 export default function MarkClassroom() {
 
   usePageTitle('Classroom Photo');
@@ -119,8 +156,9 @@ export default function MarkClassroom() {
 
     for (let i = 0; i < blobs.length; i++) {
       const file = blobs[i];
+      const optimizedBlob = await compressImageForUpload(file, 1920, 0.85);
       const fd = new FormData();
-      fd.append("image", file, "photo.jpg");
+      fd.append("image", optimizedBlob, "photo.jpg");
       fd.append("class_id", session.classId);
       fd.append("subject_id", session.subjectId);
       try {
