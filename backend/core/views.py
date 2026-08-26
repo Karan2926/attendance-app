@@ -297,11 +297,17 @@ def _pending_reg_payload(p):
 
 
 @api_view(["GET"])
-@permission_classes([IsAdmin])
+@permission_classes([IsTeacherOrAdmin])
 def pending_registrations_view(request):
-    """List pending (and recently reviewed) student registration requests."""
+    """List pending (and recently reviewed) student registration requests.
+
+    Admins see all; Teachers see pending registrations for their assigned classes.
+    """
     status_filter = request.query_params.get("status", "pending")
+    allowed_classes = services.teacher_class_ids(request.user.id, request.user.role)
     qs = PendingRegistration.objects.select_related("school_class").order_by("-submitted_at")
+    if allowed_classes is not None:
+        qs = qs.filter(school_class_id__in=allowed_classes)
     if status_filter != "all":
         qs = qs.filter(status=status_filter)
     return Response({"registrations": [_pending_reg_payload(p) for p in qs]})
@@ -374,12 +380,11 @@ def _parse_csv_rows(csv_file):
 
 
 @api_view(["POST"])
-@permission_classes([IsAdmin])
+@permission_classes([IsTeacherOrAdmin])
 def verify_registration_csv_view(request):
-    """Upload attendance-register CSV and match against all pending registrations.
+    """Upload attendance-register CSV and match against pending registrations.
 
-    Updates csv_match_status / csv_match_detail on each pending record and
-    returns the full updated list.
+    Admins match against all pending; Teachers match against their assigned class sections.
     """
     import difflib
 
@@ -393,9 +398,12 @@ def verify_registration_csv_view(request):
     if not rows:
         return Response({"error": "CSV file has no data rows"}, status=400)
 
+    allowed_classes = services.teacher_class_ids(request.user.id, request.user.role)
     pending_qs = PendingRegistration.objects.filter(
         status=PendingRegistration.STATUS_PENDING
     ).select_related("school_class")
+    if allowed_classes is not None:
+        pending_qs = pending_qs.filter(school_class_id__in=allowed_classes)
 
     updated = []
     for pending in pending_qs:
@@ -543,12 +551,16 @@ def _do_approve_pending(pending, reviewed_by):
 
 
 @api_view(["POST"])
-@permission_classes([IsAdmin])
+@permission_classes([IsTeacherOrAdmin])
 def approve_registration_view(request, reg_id):
     """Approve a single pending registration."""
     pending = get_object_or_404(PendingRegistration, id=reg_id)
     if pending.status != PendingRegistration.STATUS_PENDING:
         return Response({"error": f"Registration is already '{pending.status}', cannot approve again."}, status=400)
+
+    allowed_classes = services.teacher_class_ids(request.user.id, request.user.role)
+    if allowed_classes is not None and pending.school_class_id not in allowed_classes:
+        return Response({"error": "You are not authorized to approve registrations for this class section."}, status=403)
 
     try:
         user = _do_approve_pending(pending, request.user)
@@ -566,12 +578,16 @@ def approve_registration_view(request, reg_id):
 
 
 @api_view(["POST"])
-@permission_classes([IsAdmin])
+@permission_classes([IsTeacherOrAdmin])
 def reject_registration_view(request, reg_id):
     """Reject a pending registration (with optional reason) and clean up temp images."""
     pending = get_object_or_404(PendingRegistration, id=reg_id)
     if pending.status != PendingRegistration.STATUS_PENDING:
         return Response({"error": f"Registration is already '{pending.status}'."}, status=400)
+
+    allowed_classes = services.teacher_class_ids(request.user.id, request.user.role)
+    if allowed_classes is not None and pending.school_class_id not in allowed_classes:
+        return Response({"error": "You are not authorized to reject registrations for this class section."}, status=403)
 
     reason = (request.data.get("reason") or "").strip()
 
@@ -599,13 +615,16 @@ def reject_registration_view(request, reg_id):
 
 
 @api_view(["POST"])
-@permission_classes([IsAdmin])
+@permission_classes([IsTeacherOrAdmin])
 def bulk_approve_registrations_view(request):
     """Approve all pending registrations that matched the CSV (exact or fuzzy)."""
+    allowed_classes = services.teacher_class_ids(request.user.id, request.user.role)
     qs = PendingRegistration.objects.filter(
         status=PendingRegistration.STATUS_PENDING,
         csv_match_status__in=[PendingRegistration.CSV_EXACT, PendingRegistration.CSV_FUZZY],
     ).select_related("school_class")
+    if allowed_classes is not None:
+        qs = qs.filter(school_class_id__in=allowed_classes)
 
     results = []
     for pending in qs:

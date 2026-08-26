@@ -14,7 +14,13 @@ urlpatterns = [
     path("auth/logout", views.logout_view),
     path("auth/me", views.me_view),
     path("me/attendance", views.my_attendance_view),
-    # Admin — pending registration approvals
+    # Pending registration approvals (Teachers & Admin)
+    path("pending_registrations", views.pending_registrations_view),
+    path("pending_registrations/verify_csv", views.verify_registration_csv_view),
+    path("pending_registrations/bulk_approve", views.bulk_approve_registrations_view),
+    path("pending_registrations/<int:reg_id>/approve", views.approve_registration_view),
+    path("pending_registrations/<int:reg_id>/reject", views.reject_registration_view),
+    # Admin — pending registration approvals (legacy alias)
     path("admin/pending_registrations", views.pending_registrations_view),
     path("admin/pending_registrations/verify_csv", views.verify_registration_csv_view),
     path("admin/pending_registrations/bulk_approve", views.bulk_approve_registrations_view),
