@@ -6,8 +6,7 @@ import usePageTitle from "../components/usePageTitle";
 
 const TABS = [
   { id: "overview", label: "Overview" },
-  { id: "registrations", label: "Registrations" },
-  { id: "teachers", label: "Teachers" },
+  { id: "teachers", label: "Teachers & Mentors" },
   { id: "classes", label: "Classes & access" },
   { id: "settings", label: "Settings" },
   { id: "health", label: "Health" },

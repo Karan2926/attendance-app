@@ -209,18 +209,17 @@ export default function Dashboard() {
           </div>
 
           <div className="col-lg-8">
-            {trainCard}
-            <div className="card2 mt-4">
+            <div className="card2">
               <span className="eyebrow">How roles work</span>
-              <h5 style={{ margin: "0 0 0.75rem" }}>Admin vs Teacher</h5>
+              <h5 style={{ margin: "0 0 0.75rem" }}>Admin · Mentor · Teacher</h5>
               <p className="panel-copy" style={{ margin: 0 }}>
-                <strong>Admin</strong> — manages the structure: classes, subjects,
-                teachers, assignments and the recognition model.
+                <strong>Admin</strong> — manages the whole system: creates classes, subjects, teacher & mentor accounts, and assigns access.
               </p>
               <p className="panel-copy" style={{ margin: "0.5rem 0 0" }}>
-                <strong>Teacher</strong> — runs the daily flow: adds students with
-                face photos, marks attendance, reviews records and exports the
-                register.
+                <strong>Section Mentor</strong> — handles student self-registration approvals via CSV register for their assigned section.
+              </p>
+              <p className="panel-copy" style={{ margin: "0.5rem 0 0" }}>
+                <strong>Teacher</strong> — runs daily attendance: marks presence via face recognition, reviews records and exports registers.
               </p>
             </div>
           </div>
