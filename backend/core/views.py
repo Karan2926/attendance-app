@@ -154,6 +154,7 @@ def public_classes_view(request):
                     "section": c.section,
                     "label": c.label(),
                     "subject_count": c.subjects.count(),
+                    "subjects": [s.name for s in c.subjects.all()],
                 }
                 for c in classes
             ]

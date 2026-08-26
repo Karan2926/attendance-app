@@ -273,11 +273,26 @@ export default function Register() {
             </select>
             {classId && (() => {
               const cls = classes.find((c) => String(c.id) === String(classId));
-              return cls?.subject_count > 0 ? (
-                <div className="mono mb-3" style={{ fontSize: "0.78rem", color: "var(--teal)" }}>
-                  ✓ You'll be enrolled in all {cls.subject_count} subject{cls.subject_count !== 1 ? "s" : ""} of this class automatically
+              if (!cls) return <div className="mb-3" />;
+              const subList = cls.subjects || [];
+              return subList.length > 0 ? (
+                <div className="card2 mb-3" style={{ padding: "0.6rem 0.8rem", background: "#F0FDFA", borderColor: "#99F6E4" }}>
+                  <div className="mono" style={{ fontSize: "0.75rem", color: "var(--teal)", fontWeight: 700, marginBottom: "0.2rem" }}>
+                    ✓ AUTOMATIC ENROLLMENT IN {subList.length} SUBJECT{subList.length !== 1 ? "S" : ""}:
+                  </div>
+                  <div style={{ fontSize: "0.82rem", color: "var(--ink)", display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                    {subList.map((s, idx) => (
+                      <span key={idx} style={{ background: "#CCFBF1", padding: "0.15rem 0.5rem", borderRadius: "4px", fontWeight: 500 }}>
+                        {s}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              ) : <div className="mb-3" />;
+              ) : (
+                <div className="mono mb-3" style={{ fontSize: "0.78rem", color: "#D97706" }}>
+                  ⚠️ Note: No subjects have been added to this class yet by the admin.
+                </div>
+              );
             })()}
 
             <div className="d-flex gap-2">
