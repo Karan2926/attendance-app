@@ -43,13 +43,25 @@ export default function Layout({ children }) {
                 My Attendance
               </NavLink>
             </>
+          ) : role === "mentor" ? (
+            <>
+              <NavLink to="/mentor_approvals" className={navLinkClass}>
+                Section Approvals &amp; CSV
+              </NavLink>
+              <NavLink to="/manage_students" className={navLinkClass}>
+                Section Roster
+              </NavLink>
+              <NavLink to="/add_student" className={navLinkClass}>
+                Add Student
+              </NavLink>
+            </>
           ) : role === "admin" ? (
             <>
               <NavLink to="/" className={navLinkClass} end>
                 Dashboard
               </NavLink>
               <NavLink to="/admin" className={navLinkClass}>
-                Manage System
+                System Management
               </NavLink>
               <NavLink to="/admin?tab=audit" className={navLinkClass}>
                 Audit Log
@@ -57,15 +69,6 @@ export default function Layout({ children }) {
             </>
           ) : (
             <>
-              <NavLink to="/add_student" className={navLinkClass}>
-                Add Student
-              </NavLink>
-              <NavLink to="/manage_students" className={navLinkClass}>
-                Manage Students
-              </NavLink>
-              <NavLink to="/mentor_approvals" className={navLinkClass}>
-                Section Mentor Portal
-              </NavLink>
               <NavLink to="/mark_attendance" className={navLinkClass}>
                 Mark Attendance
               </NavLink>

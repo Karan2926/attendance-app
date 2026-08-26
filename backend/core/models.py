@@ -73,6 +73,7 @@ class RoleUser(AbstractUser):
     ROLE_CHOICES = [
         ("admin", "admin"),
         ("teacher", "teacher"),
+        ("mentor", "mentor"),
         ("student", "student"),
     ]
     password = models.CharField(max_length=300)

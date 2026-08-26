@@ -14,7 +14,7 @@ class IsTeacherOrAdmin(BasePermission):
         u = request.user
         if not (u and u.is_authenticated):
             return False
-        return getattr(u, "role", None) in ("teacher", "admin")
+        return getattr(u, "role", None) in ("teacher", "mentor", "admin")
 
 
 class IsStudent(BasePermission):

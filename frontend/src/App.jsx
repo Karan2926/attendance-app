@@ -59,6 +59,8 @@ function HomeGate() {
     );
   }
   if (user) {
+    if (user.role === "mentor") return <Navigate to="/mentor_approvals" replace />;
+    if (user.role === "student") return <Navigate to="/my_attendance" replace />;
     return (
       <Layout>
         <Dashboard />
@@ -103,7 +105,7 @@ export default function App() {
           <Route
             path="/add_student"
             element={
-              <RequireRole roles={["teacher"]}>
+              <RequireRole roles={["mentor", "teacher", "admin"]}>
                 <AddStudent />
               </RequireRole>
             }
@@ -111,7 +113,7 @@ export default function App() {
           <Route
             path="/manage_students"
             element={
-              <RequireRole roles={["teacher"]}>
+              <RequireRole roles={["mentor", "teacher", "admin"]}>
                 <ManageStudents />
               </RequireRole>
             }
@@ -119,7 +121,7 @@ export default function App() {
           <Route
             path="/mentor_approvals"
             element={
-              <RequireRole roles={["teacher"]}>
+              <RequireRole roles={["mentor", "teacher", "admin"]}>
                 <MentorApprovals />
               </RequireRole>
             }
@@ -127,7 +129,7 @@ export default function App() {
           <Route
             path="/mark_attendance"
             element={
-              <RequireRole roles={["teacher"]}>
+              <RequireRole roles={["teacher", "admin"]}>
                 <MarkAttendance />
               </RequireRole>
             }
@@ -135,7 +137,7 @@ export default function App() {
           <Route
             path="/mark_attendance_classroom"
             element={
-              <RequireRole roles={["teacher"]}>
+              <RequireRole roles={["teacher", "admin"]}>
                 <MarkClassroom />
               </RequireRole>
             }
