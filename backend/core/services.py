@@ -81,8 +81,8 @@ def get_user_assignments(user_id: int, role: str):
                     "subject_id": ta.subject_id,
                     "class_name": ta.school_class.name,
                     "section": ta.school_class.section,
-                    "subject_name": ta.subject.name,
-                    "subject_code": ta.subject.code,
+                    "subject_name": ta.subject.name if ta.subject else None,
+                    "subject_code": ta.subject.code if ta.subject else None,
                 }
             )
     return rows

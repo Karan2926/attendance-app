@@ -830,17 +830,18 @@ function ClassAccessTab({ overview, classes, subjects, teachers, assignments, on
     } catch {}
   }
 
+  const selectedUser = teachers.find((t) => String(t.id) === String(newAssign.user_id));
+  const isMentor = selectedUser?.role === "mentor";
+
   async function assignTeacher(e) {
     e.preventDefault();
     try {
-      await api.post("/assignments", {
-        user_id: newAssign.user_id,
-        class_id: newAssign.class_id,
-        subject_id: newAssign.subject_id,
-      });
+      const payload = { user_id: newAssign.user_id, class_id: newAssign.class_id };
+      if (!isMentor) payload.subject_id = newAssign.subject_id;
+      await api.post("/assignments", payload);
       setNewAssign({ user_id: "", class_id: "", subject_id: "" });
       setAssignSubjects([]);
-      toast.success("Teacher assigned");
+      toast.success(isMentor ? "Section Mentor assigned to class section" : "Teacher assigned to subject");
       onChanged();
     } catch (err) {
       toast.error(err.message);
@@ -887,41 +888,51 @@ function ClassAccessTab({ overview, classes, subjects, teachers, assignments, on
 
       <div className="col-lg-4">
         <div className="card2">
-          <span className="eyebrow">Assign teacher</span>
+          <span className="eyebrow">Assign Access</span>
+          <h2 className="panel-title">Assign to Class Section</h2>
           <form onSubmit={assignTeacher} className="mt-2">
-            <label className="label2">Teacher</label>
-            <select className="input2 mb-2" value={newAssign.user_id} onChange={(e) => setNewAssign({ ...newAssign, user_id: e.target.value })} required>
-              <option value="">Select teacher</option>
+            <label className="label2">Teacher or Mentor</label>
+            <select className="input2 mb-2" value={newAssign.user_id} onChange={(e) => setNewAssign({ ...newAssign, user_id: e.target.value, subject_id: "" })} required>
+              <option value="">Select account</option>
               {teachers.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.username}
-                  {t.full_name ? ` (${t.full_name})` : ""}
+                  {t.role === "mentor" ? "🧑‍🏫" : "👨‍🏫"} {t.username}{t.full_name ? ` (${t.full_name})` : ""}
                 </option>
               ))}
             </select>
-            <label className="label2">Class</label>
+            {isMentor && (
+              <div className="mono mb-2" style={{ fontSize: "0.78rem", color: "var(--teal)", background: "#F0FDF4", borderRadius: 6, padding: "0.4rem 0.6rem" }}>
+                🧑‍🏫 Mentor — will be assigned to the entire class section. No subject needed.
+              </div>
+            )}
+            <label className="label2">Class Section</label>
             <select className="input2 mb-2" value={newAssign.class_id} onChange={onAssignClassChange} required>
-              <option value="">Select class</option>
+              <option value="">Select class section</option>
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.section ? ` — Sec ${c.section}` : ""}
+                  {c.name}{c.section ? ` — Sec ${c.section}` : ""}
                 </option>
               ))}
             </select>
-            <label className="label2">Subject</label>
-            <select className="input2 mb-3" value={newAssign.subject_id} onChange={(e) => setNewAssign({ ...newAssign, subject_id: e.target.value })} required>
-              <option value="">Select subject</option>
-              {assignSubjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.code ? `${s.name} (${s.code})` : s.name}
-                </option>
-              ))}
-            </select>
-            <button className="btn2 btn2-primary w-100" type="submit">Assign access</button>
+            {!isMentor && (
+              <>
+                <label className="label2">Subject</label>
+                <select className="input2 mb-3" value={newAssign.subject_id} onChange={(e) => setNewAssign({ ...newAssign, subject_id: e.target.value })} required>
+                  <option value="">Select subject</option>
+                  {assignSubjects.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.code ? `${s.name} (${s.code})` : s.name}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            <button className="btn2 btn2-primary w-100" type="submit">
+              {isMentor ? "Assign Mentor to Section" : "Assign Teacher to Subject"}
+            </button>
           </form>
           <div className="mt-3 mono" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-            This is what keeps Teacher A from seeing Teacher B's students.
+            Mentors are assigned per section. Teachers are assigned per subject.
           </div>
         </div>
       </div>

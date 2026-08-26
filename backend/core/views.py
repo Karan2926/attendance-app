@@ -846,17 +846,43 @@ def create_teacher_view(request):
 @api_view(["POST"])
 @permission_classes([IsAdmin])
 def assign_teacher_view(request):
+    from .models import RoleUser
+
     try:
         user_id = int(request.data.get("user_id"))
         class_id = int(request.data.get("class_id"))
+    except (TypeError, ValueError):
+        return Response({"error": "user_id and class_id required"}, status=400)
+
+    user = RoleUser.objects.filter(id=user_id, role__in=["teacher", "mentor"]).first()
+    if not user:
+        return Response({"error": "teacher or mentor not found"}, status=404)
+
+    # Mentors are assigned at class level only — no subject required
+    if user.role == "mentor":
+        try:
+            with transaction.atomic():
+                a = TeacherAssignment.objects.create(
+                    user_id=user_id,
+                    school_class_id=class_id,
+                    subject_id=None,
+                    created_at=now_iso(),
+                )
+        except IntegrityError:
+            return Response({"error": "mentor already assigned to this class section"}, status=409)
+        services.log_action(
+            request.user,
+            "assignment.created",
+            target=f"Mentor #{user_id} → class #{class_id}",
+        )
+        return Response({"assignment_id": a.id}, status=201)
+
+    # Teachers require a subject
+    try:
         subject_id = int(request.data.get("subject_id"))
     except (TypeError, ValueError):
-        return Response({"error": "user_id, class_id, subject_id required"}, status=400)
+        return Response({"error": "subject_id required for teacher assignment"}, status=400)
 
-    from .models import RoleUser
-
-    if not RoleUser.objects.filter(id=user_id, role__in=["teacher", "mentor"]).exists():
-        return Response({"error": "teacher or mentor not found"}, status=404)
     if not Subject.objects.filter(id=subject_id, school_class_id=class_id).exists():
         return Response({"error": "subject does not belong to class"}, status=400)
     try:
@@ -872,7 +898,7 @@ def assign_teacher_view(request):
     services.log_action(
         request.user,
         "assignment.created",
-        target=f"User #{user_id} → class #{class_id} subject #{subject_id}",
+        target=f"Teacher #{user_id} → class #{class_id} subject #{subject_id}",
     )
     return Response({"assignment_id": a.id}, status=201)
 

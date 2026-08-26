@@ -106,7 +106,11 @@ class TeacherAssignment(models.Model):
     school_class = models.ForeignKey(
         "SchoolClass", db_column="class_id", on_delete=models.CASCADE
     )
-    subject = models.ForeignKey("Subject", db_column="subject_id", on_delete=models.CASCADE)
+    # Null for mentor assignments (mentors manage a section, not a specific subject)
+    subject = models.ForeignKey(
+        "Subject", db_column="subject_id", on_delete=models.CASCADE,
+        null=True, blank=True
+    )
     created_at = models.TextField(null=True, blank=True, default=now_iso)
 
     class Meta:
