@@ -346,8 +346,9 @@ export default function Admin() {
                 }}>
                   <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📋</div>
                   <div className="panel-copy" style={{ marginBottom: "0.75rem", fontSize: "0.85rem" }}>
-                    CSV with any of these columns:<br />
-                    <span className="mono" style={{ fontSize: "0.78rem", color: "var(--teal)" }}>Roll No, Name, Reg No</span>
+                    CSV with columns like:<br />
+                    <span className="mono" style={{ fontSize: "0.78rem", color: "var(--teal)" }}>Roll No. · Name of the Student</span><br />
+                    <span className="mono" style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>(ITM register format supported)</span>
                   </div>
                   <label className="btn2 btn2-outline" style={{ cursor: "pointer", display: "inline-block" }}>
                     {csvVerifying ? "Verifying…" : "📂 Choose CSV File"}

@@ -307,9 +307,13 @@ def pending_registrations_view(request):
 
 
 def _parse_csv_rows(csv_file):
-    """Read uploaded CSV and return list-of-dicts with canonical keys."""
+    """Read uploaded CSV and return list-of-dicts with canonical keys.
+
+    Handles ITM University-Gwalior attendance register format:
+      S.No. | Roll No. | Name of the Student | ...date columns...
+    as well as common Excel/CSV export variants.
+    """
     import csv as _csv
-    import difflib
 
     try:
         text = csv_file.read().decode("utf-8-sig", errors="replace")
@@ -320,25 +324,50 @@ def _parse_csv_rows(csv_file):
     if reader.fieldnames is None:
         return None, "CSV appears to be empty or has no header row"
 
-    # Map arbitrary column names to canonical keys
+    # Map arbitrary column names to canonical keys.
+    # Normalise: strip whitespace, lowercase, collapse punctuation/spaces to underscore.
+    def _norm(h):
+        import re
+        return re.sub(r"[\s.\-/]+", "_", h.strip().lower()).strip("_")
+
     def _canon(h):
-        h2 = h.strip().lower().replace(" ", "_").replace(".", "").replace("-", "_").replace("/", "_")
-        if h2 in ("roll", "roll_no", "roll_number", "scholar_no", "enrollment_no",
-                  "enrolment_no", "sr_no", "sno", "s_no", "rollno"):
+        n = _norm(h)
+        # ── Roll number ──────────────────────────────────────────────────────
+        if n in (
+            "roll", "roll_no", "roll_number", "rollno",
+            "scholar_no", "scholar_number",
+            "enrollment_no", "enrolment_no", "enroll_no",
+            "s_no", "sr_no",          # some registers label roll as S.No.
+        ):
             return "roll"
-        if h2 in ("name", "student_name", "full_name", "students_name",
-                  "candidate_name", "stud_name", "sname"):
+        # ── Student name ─────────────────────────────────────────────────────
+        # ITM register: "Name of the Student"
+        if n in (
+            "name", "student_name", "full_name",
+            "name_of_the_student", "name_of_student",
+            "students_name", "candidate_name",
+            "stud_name", "sname",
+        ):
             return "name"
-        if h2 in ("reg_no", "registration_no", "registration_number",
-                  "reg_number", "regno", "regn"):
+        # ── Registration / Enrollment number ─────────────────────────────────
+        if n in (
+            "reg_no", "registration_no", "registration_number",
+            "reg_number", "regno", "regn",
+        ):
             return "reg_no"
-        return h2
+        # ── Serial number — keep as _sno so we never mistake it for roll ─────
+        if n in ("sno", "sl_no", "sl", "serial_no", "serial"):
+            return "_sno"
+        return n
 
     col_map = {h: _canon(h) for h in (reader.fieldnames or [])}
 
     rows = []
     for raw in reader:
         row = {col_map.get(k, k): (v or "").strip() for k, v in raw.items()}
+        # Skip completely empty rows (common in ITM register CSVs with blank lines)
+        if not any(row.values()):
+            continue
         rows.append(row)
     return rows, None
 
