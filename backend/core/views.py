@@ -818,6 +818,9 @@ def create_teacher_view(request):
     username = (request.data.get("username") or "").strip()
     password = request.data.get("password") or ""
     full_name = (request.data.get("full_name") or "").strip() or None
+    role = (request.data.get("role") or "teacher").strip().lower()
+    if role not in ("teacher", "mentor"):
+        role = "teacher"
     if not username or not password:
         return Response({"error": "username and password required"}, status=400)
     try:
@@ -825,7 +828,7 @@ def create_teacher_view(request):
             user = get_user_model().objects.create_user(
                 username=username,
                 password=password,
-                role="teacher",
+                role=role,
                 full_name=full_name,
                 created_at=now_iso(),
             )
@@ -852,8 +855,8 @@ def assign_teacher_view(request):
 
     from .models import RoleUser
 
-    if not RoleUser.objects.filter(id=user_id, role="teacher").exists():
-        return Response({"error": "teacher not found"}, status=404)
+    if not RoleUser.objects.filter(id=user_id, role__in=["teacher", "mentor"]).exists():
+        return Response({"error": "teacher or mentor not found"}, status=404)
     if not Subject.objects.filter(id=subject_id, school_class_id=class_id).exists():
         return Response({"error": "subject does not belong to class"}, status=400)
     try:
@@ -869,7 +872,7 @@ def assign_teacher_view(request):
     services.log_action(
         request.user,
         "assignment.created",
-        target=f"Teacher #{user_id} → class #{class_id} subject #{subject_id}",
+        target=f"User #{user_id} → class #{class_id} subject #{subject_id}",
     )
     return Response({"assignment_id": a.id}, status=201)
 
@@ -905,9 +908,9 @@ def admin_overview_view(request):
     )
     teachers = list(
         get_user_model()
-        .objects.filter(role="teacher")
+        .objects.filter(role__in=["teacher", "mentor"])
         .order_by("username")
-        .values("id", "username", "full_name", "created_at")
+        .values("id", "username", "full_name", "role", "created_at")
     )
     assignments = list(
         TeacherAssignment.objects.select_related("user", "school_class", "subject")

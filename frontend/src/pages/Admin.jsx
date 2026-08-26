@@ -61,7 +61,7 @@ export default function Admin() {
   const [rejectReason, setRejectReason] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
 
-  const [newTeacher, setNewTeacher] = useState({ full_name: "", username: "", password: "" });
+  const [newTeacher, setNewTeacher] = useState({ full_name: "", username: "", password: "", role: "mentor" });
   const [draft, setDraft] = useState({});
 
   const loadOverview = useCallback(async () => {
@@ -129,8 +129,8 @@ export default function Admin() {
     e.preventDefault();
     try {
       await api.post("/teachers", newTeacher);
-      setNewTeacher({ full_name: "", username: "", password: "" });
-      toast.success("Teacher created");
+      setNewTeacher({ full_name: "", username: "", password: "", role: "mentor" });
+      toast.success(newTeacher.role === "mentor" ? "Section Mentor account created" : "Teacher account created");
       loadOverview();
       loadStats();
     } catch (err) {
@@ -559,8 +559,18 @@ export default function Admin() {
         <div className="row g-4">
           <div className="col-lg-4">
             <div className="card2">
-              <span className="eyebrow">Create teacher</span>
+              <span className="eyebrow">Create Account</span>
+              <h2 className="panel-title">Add Teacher or Mentor</h2>
               <form onSubmit={createTeacher} className="mt-2">
+                <label className="label2">Account Type / Role</label>
+                <select
+                  className="input2 mb-2"
+                  value={newTeacher.role || "mentor"}
+                  onChange={(e) => setNewTeacher({ ...newTeacher, role: e.target.value })}
+                >
+                  <option value="mentor">🧑‍🏫 Section Mentor (Roster &amp; CSV Approvals)</option>
+                  <option value="teacher">👨‍🏫 Subject Teacher (Mark Attendance)</option>
+                </select>
                 <label className="label2">Full name</label>
                 <input
                   className="input2 mb-2"
@@ -584,12 +594,12 @@ export default function Admin() {
                   required
                 />
                 <button className="btn2 btn2-teal w-100" type="submit">
-                  Create teacher
+                  Create {newTeacher.role === "mentor" ? "Section Mentor" : "Teacher"} Account
                 </button>
               </form>
               <div className="mt-3 mono" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-                Tip: after creating a teacher, use "Classes &amp; access" to assign
-                them their class + subject — otherwise they won't see any students.
+                Tip: after creating an account, use "Classes &amp; access" to assign
+                them their class section.
               </div>
             </div>
           </div>
