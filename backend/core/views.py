@@ -139,47 +139,157 @@ def login_view(request):
     return resp
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_classes_view(request):
+    """Public list of active classes for the student registration dropdown."""
+    classes = SchoolClass.objects.all().order_by("name", "section")
+    return Response(
+        {
+            "classes": [
+                {
+                    "id": c.id,
+                    "name": c.name,
+                    "section": c.section,
+                    "label": c.label(),
+                }
+                for c in classes
+            ]
+        }
+    )
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
-@rate_limit(lambda r: "register", 10, 60)
+@rate_limit(lambda r: "register", 15, 60)
 def register_view(request):
+    """Student self-registration with multi-angle face upload and instant centroid creation."""
     if not settings.ALLOW_PUBLIC_REGISTER:
-        return Response({"error": "Public registration disabled"}, status=403)
+        return Response({"error": "Public registration is currently disabled by administrator."}, status=403)
 
-    username = (request.data.get("username") or "").strip()
-    password = request.data.get("password") or ""
-    roll = (request.data.get("roll") or "").strip()
-    invite = (request.data.get("invite_code") or "").strip()
+    data = request.data
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    roll = (data.get("roll") or "").strip()
+    name = (data.get("name") or "").strip()
+    reg_no = (data.get("reg_no") or "").strip()
+    class_id_raw = data.get("class_id")
+    invite = (data.get("invite_code") or "").strip()
 
     if settings.REGISTER_INVITE_CODE and invite != settings.REGISTER_INVITE_CODE:
-        return Response({"error": "Invalid invite code."}, status=400)
+        return Response({"error": "Invalid invite code. Ask your teacher for the registration code."}, status=400)
     if not username or not password or not roll:
-        return Response({"error": "All fields are required."}, status=400)
+        return Response({"error": "Username, password, and roll number are required."}, status=400)
     if len(password) < 8:
-        return Response({"error": "Password must be at least 8 characters."}, status=400)
+        return Response({"error": "Password must be at least 8 characters long."}, status=400)
+
+    User = get_user_model()
+    if User.objects.filter(username=username).exists():
+        return Response({"error": "That username is already taken. Please choose another."}, status=400)
 
     st = Student.objects.filter(roll=roll).first()
+
+    # Self-Registration Mode: Student enters name + class + photos
     if not st:
-        return Response(
-            {"error": "No student found with that roll number. Ask your teacher to add you first."},
-            status=400,
+        if not name:
+            return Response({"error": "Full Name is required for registration."}, status=400)
+        
+        class_id = None
+        cls_name = ""
+        cls_sec = ""
+        if class_id_raw:
+            try:
+                class_id = int(class_id_raw)
+                sclass = SchoolClass.objects.filter(id=class_id).first()
+                if sclass:
+                    cls_name = sclass.name
+                    cls_sec = sclass.section
+            except (ValueError, TypeError):
+                pass
+
+        st = Student.objects.create(
+            name=name,
+            roll=roll,
+            reg_no=reg_no or None,
+            class_text=cls_name,
+            section=cls_sec,
+            school_class_id=class_id,
+            created_at=now_iso(),
         )
-    User = get_user_model()
-    if User.objects.filter(student_id=st.id).exists():
-        return Response({"error": "An account already exists for this student."}, status=400)
-    if User.objects.filter(username=username).exists():
-        return Response({"error": "That username is already taken."}, status=400)
+        if class_id:
+            Enrollment.objects.get_or_create(
+                student=st, school_class_id=class_id, defaults={"created_at": now_iso()}
+            )
+    else:
+        if User.objects.filter(student_id=st.id).exists():
+            return Response({"error": "An account already exists for this roll number."}, status=400)
+
+    # Process face capture images if uploaded
+    files = request.FILES.getlist("images[]") or request.FILES.getlist("images")
+    if files:
+        import numpy as np
+        import cv2
+        from .recognition import get_face_app
+
+        folder = os.path.join(DATASET_DIR, str(st.id))
+        os.makedirs(folder, exist_ok=True)
+        has_profile = os.path.exists(os.path.join(folder, "profile.jpg"))
+        saved = 0
+        embeddings = []
+
+        face_app = get_face_app((640, 640))
+
+        for f in files[: settings.MAX_CAPTURE_IMAGES]:
+            clean, err = read_upload(f)
+            if err:
+                continue
+            try:
+                fname = f"{datetime.datetime.utcnow().timestamp():.6f}_{saved}.jpg"
+                path = os.path.join(folder, fname)
+                with open(path, "wb") as out:
+                    out.write(clean)
+
+                if saved == 0 and not has_profile:
+                    _save_compact_profile(path, os.path.join(folder, "profile.jpg"))
+
+                # Extract face embedding for instantaneous centroid creation
+                arr = np.frombuffer(clean, np.uint8)
+                img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                if img is not None:
+                    detected_faces = face_app.get(img)
+                    if detected_faces:
+                        best = sorted(
+                            detected_faces,
+                            key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
+                            reverse=True,
+                        )[0]
+                        embeddings.append(np.asarray(best.normed_embedding, dtype=np.float32))
+
+                saved += 1
+            except Exception:
+                continue
+
+        # If embeddings collected, compute centroid and persist to DB immediately
+        if embeddings:
+            stack = np.stack(embeddings)
+            centroid = np.mean(stack, axis=0)
+            norm = np.linalg.norm(centroid)
+            if norm > 1e-6:
+                centroid = centroid / norm
+            services.upsert_face_centroid(st.id, centroid, len(embeddings))
 
     user = User.objects.create_user(
         username=username,
         password=password,
         role="student",
         student=st,
+        full_name=st.name,
         created_at=now_iso(),
     )
     token, _ = Token.objects.get_or_create(user=user)
-    services.log_action(user, "auth.register", target=username)
-    resp = Response({"user": _user_payload(user)}, status=201)
+    services.log_action(user, "auth.student_register", target=f"Student #{st.id} ({st.name})")
+
+    resp = Response({"user": _user_payload(user), "student_id": st.id}, status=201)
     resp.set_cookie(
         settings.AUTH_COOKIE_NAME,
         token.key,

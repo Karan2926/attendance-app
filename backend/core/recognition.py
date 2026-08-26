@@ -641,21 +641,62 @@ def train_model_background(dataset_dir, progress_callback=None, prune_after=None
         progress_callback(100, msg)
 
 
-def check_face_quality(stream_or_bytes, min_face_ratio=0.04):
+def check_face_quality(stream_or_bytes, min_face_ratio=0.035):
+    import cv2
+
     img = _decode_image(stream_or_bytes)
     if img is None:
-        return {"ok": False, "reason": "invalid image"}
+        return {"ok": False, "reason": "Invalid image"}
 
     faces = get_face_app((640, 640)).get(img)
     if len(faces) == 0:
-        return {"ok": False, "reason": "No face detected"}
+        return {"ok": False, "reason": "No face detected — face the camera"}
     if len(faces) > 1:
-        return {"ok": False, "reason": "More than one face in frame"}
+        return {"ok": False, "reason": "Multiple faces detected — only one person allowed"}
 
     h, w = img.shape[:2]
-    x1, y1, x2, y2 = faces[0].bbox
-    face_area_ratio = ((x2 - x1) * (y2 - y1)) / (w * h)
+    x1, y1, x2, y2 = [int(v) for v in faces[0].bbox]
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(w, x2), min(h, y2)
+    fw, fh = x2 - x1, y2 - y1
+
+    if fw < 40 or fh < 40:
+        return {"ok": False, "reason": "Move closer to the camera"}
+
+    face_area_ratio = (fw * fh) / (w * h)
     if face_area_ratio < min_face_ratio:
         return {"ok": False, "reason": "Move closer to the camera"}
 
-    return {"ok": True}
+    # Quality Check 1: Lighting / Luminance on face
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    face_crop = gray[y1:y2, x1:x2]
+    mean_brightness = float(np.mean(face_crop)) if face_crop.size > 0 else float(np.mean(gray))
+
+    if mean_brightness < 55.0:
+        return {
+            "ok": False,
+            "reason": "Too dark — please turn on lights or face a light source",
+            "brightness": round(mean_brightness, 1),
+        }
+    if mean_brightness > 235.0:
+        return {
+            "ok": False,
+            "reason": "Too bright / direct glare — avoid backlight",
+            "brightness": round(mean_brightness, 1),
+        }
+
+    # Quality Check 2: Sharpness / Motion Blur
+    target_crop = face_crop if face_crop.size > 0 else gray
+    laplacian_var = float(cv2.Laplacian(target_crop, cv2.CV_64F).var())
+    if laplacian_var < 30.0:
+        return {
+            "ok": False,
+            "reason": "Image is blurry — please hold still",
+            "sharpness": round(laplacian_var, 1),
+        }
+
+    return {
+        "ok": True,
+        "brightness": round(mean_brightness, 1),
+        "sharpness": round(laplacian_var, 1),
+    }

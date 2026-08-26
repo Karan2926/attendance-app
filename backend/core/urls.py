@@ -10,6 +10,7 @@ urlpatterns = [
     # Auth
     path("auth/login", views.login_view),
     path("auth/register", views.register_view),
+    path("public_classes", views.public_classes_view),
     path("auth/logout", views.logout_view),
     path("auth/me", views.me_view),
     path("me/attendance", views.my_attendance_view),

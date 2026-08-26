@@ -212,7 +212,7 @@ CSP_ENABLED = os.environ.get("CSP_ENABLED", "0") == "1"
 DATASET_DIR = os.environ.get("DATASET_DIR", str(BASE_DIR / "dataset"))
 MODEL_PATH = os.environ.get("MODEL_PATH", str(BASE_DIR / "model.pkl"))
 TRAIN_STATUS_FILE = os.environ.get("TRAIN_STATUS_FILE", str(BASE_DIR / "train_status.json"))
-ALLOW_PUBLIC_REGISTER = os.environ.get("ALLOW_PUBLIC_REGISTER", "0") == "1"
+ALLOW_PUBLIC_REGISTER = os.environ.get("ALLOW_PUBLIC_REGISTER", "1") == "1"
 REGISTER_INVITE_CODE = os.environ.get("REGISTER_INVITE_CODE", "").strip()
 KEEP_CAPTURE_IMAGES = os.environ.get("KEEP_CAPTURE_IMAGES", "0") == "1"
 MAX_CAPTURE_IMAGES = int(os.environ.get("MAX_CAPTURE_IMAGES", "48"))
