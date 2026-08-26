@@ -1684,8 +1684,8 @@ def prune_captures_view(request):
 # Recognition
 # ---------------------------------------------------------------------------
 @api_view(["POST"])
-@permission_classes([IsTeacherOrAdmin])
-@rate_limit(lambda r: r.user.id, 60, 60)
+@permission_classes([AllowAny])
+@rate_limit(lambda r: f"check_face_{r.META.get('REMOTE_ADDR')}", 60, 60)
 def check_face_view(request):
     img_stream, err = _clean_upload(request)
     if err:
