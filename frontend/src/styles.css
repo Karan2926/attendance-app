@@ -457,7 +457,7 @@ h5 {
 .input2:focus {
   outline: none;
   border-color: #c9a227;
-  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.14) 0.18);
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.14);
 }
 .label2 {
   display: block;
