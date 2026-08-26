@@ -227,3 +227,67 @@ class AuditLog(models.Model):
             models.Index(fields=["action"]),
             models.Index(fields=["created_at"]),
         ]
+
+
+class PendingRegistration(models.Model):
+    """Student self-registration requests awaiting admin approval.
+
+    Face images are stored in ``temp_image_dir`` until the request is approved
+    (moved to the real dataset folder) or rejected (deleted).
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_APPROVED, "Approved"),
+        (STATUS_REJECTED, "Rejected"),
+    ]
+
+    CSV_EXACT = "exact"
+    CSV_FUZZY = "fuzzy"
+    CSV_NONE = "none"
+
+    name = models.CharField(max_length=255)
+    roll = models.CharField(max_length=64)
+    reg_no = models.CharField(max_length=128, null=True, blank=True)
+    school_class = models.ForeignKey(
+        "SchoolClass",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pending_registrations",
+    )
+    username = models.CharField(max_length=150)
+    # Stores a Django make_password() hash — NOT plain-text.
+    password_hash = models.CharField(max_length=300)
+    # Absolute path to the temporary directory holding face capture images.
+    temp_image_dir = models.TextField(null=True, blank=True)
+    face_sample_count = models.IntegerField(default=0)
+    invite_code_used = models.CharField(max_length=128, null=True, blank=True)
+    status = models.CharField(max_length=16, default=STATUS_PENDING, choices=STATUS_CHOICES)
+    # Result after admin uploads CSV — "exact" | "fuzzy" | "none" | null (not yet verified)
+    csv_match_status = models.CharField(max_length=16, null=True, blank=True)
+    # Full detail of the best CSV row match (stored as JSON dict).
+    csv_match_detail = models.JSONField(null=True, blank=True)
+    submitted_at = models.TextField(default=now_iso)
+    reviewed_at = models.TextField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        "RoleUser",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_registrations",
+    )
+    reject_reason = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "pending_registrations"
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["submitted_at"]),
+        ]
+
+    def __str__(self):
+        return f"PendingReg #{self.id} — {self.name} ({self.roll}) [{self.status}]"

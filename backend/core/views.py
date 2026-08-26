@@ -29,6 +29,7 @@ from .models import (
     AuditLog,
     Enrollment,
     FaceEmbedding,
+    PendingRegistration,
     SchoolClass,
     Student,
     Subject,
@@ -142,8 +143,8 @@ def login_view(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def public_classes_view(request):
-    """Public list of active classes for the student registration dropdown."""
-    classes = SchoolClass.objects.all().order_by("name", "section")
+    """Public list of active classes with their subjects for the registration dropdown."""
+    classes = SchoolClass.objects.prefetch_related("subjects").all().order_by("name", "section")
     return Response(
         {
             "classes": [
@@ -152,6 +153,7 @@ def public_classes_view(request):
                     "name": c.name,
                     "section": c.section,
                     "label": c.label(),
+                    "subject_count": c.subjects.count(),
                 }
                 for c in classes
             ]
@@ -163,7 +165,11 @@ def public_classes_view(request):
 @permission_classes([AllowAny])
 @rate_limit(lambda r: "register", 15, 60)
 def register_view(request):
-    """Student self-registration with multi-angle face upload and instant centroid creation."""
+    """Student self-registration — creates a PendingRegistration for admin approval.
+
+    Face images are stored in a temporary directory under DATASET_DIR/pending/<pending_id>/.
+    The admin must approve before the student account is fully created.
+    """
     if not settings.ALLOW_PUBLIC_REGISTER:
         return Response({"error": "Public registration is currently disabled by administrator."}, status=403)
 
@@ -176,130 +182,416 @@ def register_view(request):
     class_id_raw = data.get("class_id")
     invite = (data.get("invite_code") or "").strip()
 
+    # Validate invite code
     if settings.REGISTER_INVITE_CODE and invite != settings.REGISTER_INVITE_CODE:
         return Response({"error": "Invalid invite code. Ask your teacher for the registration code."}, status=400)
-    if not username or not password or not roll:
-        return Response({"error": "Username, password, and roll number are required."}, status=400)
+
+    # Required field validation
+    if not username or not password or not roll or not name:
+        return Response({"error": "Full name, username, password, and roll number are required."}, status=400)
     if len(password) < 8:
         return Response({"error": "Password must be at least 8 characters long."}, status=400)
 
     User = get_user_model()
+    # Check username is not already taken (active account or another pending request)
     if User.objects.filter(username=username).exists():
         return Response({"error": "That username is already taken. Please choose another."}, status=400)
+    if PendingRegistration.objects.filter(username=username, status=PendingRegistration.STATUS_PENDING).exists():
+        return Response({"error": "A pending registration with that username already exists."}, status=400)
 
-    st = Student.objects.filter(roll=roll).first()
+    # Check roll number is not already registered or pending
+    if Student.objects.filter(roll=roll).exists() and User.objects.filter(student__roll=roll).exists():
+        return Response({"error": "An account already exists for this roll number."}, status=400)
+    if PendingRegistration.objects.filter(roll=roll, status=PendingRegistration.STATUS_PENDING).exists():
+        return Response({"error": "A pending registration already exists for this roll number. Please wait for admin approval."}, status=400)
 
-    # Self-Registration Mode: Student enters name + class + photos
-    if not st:
-        if not name:
-            return Response({"error": "Full Name is required for registration."}, status=400)
-        
-        class_id = None
-        cls_name = ""
-        cls_sec = ""
-        if class_id_raw:
-            try:
-                class_id = int(class_id_raw)
-                sclass = SchoolClass.objects.filter(id=class_id).first()
-                if sclass:
-                    cls_name = sclass.name
-                    cls_sec = sclass.section
-            except (ValueError, TypeError):
-                pass
+    # Validate class_id
+    school_class = None
+    if class_id_raw:
+        try:
+            school_class = SchoolClass.objects.filter(id=int(class_id_raw)).first()
+        except (ValueError, TypeError):
+            pass
 
-        st = Student.objects.create(
+    # Hash the password (stored as make_password hash, applied on approval)
+    from django.contrib.auth.hashers import make_password as _make_password
+    password_hash = _make_password(password)
+
+    # Create the PendingRegistration record first to get an ID for the temp dir
+    with transaction.atomic():
+        pending = PendingRegistration.objects.create(
             name=name,
             roll=roll,
             reg_no=reg_no or None,
+            school_class=school_class,
+            username=username,
+            password_hash=password_hash,
+            invite_code_used=invite or None,
+            temp_image_dir="",
+            face_sample_count=0,
+        )
+
+        # Process face capture images into the temp directory
+        files = request.FILES.getlist("images[]") or request.FILES.getlist("images")
+        saved = 0
+        temp_dir = os.path.join(DATASET_DIR, "pending", str(pending.id))
+        os.makedirs(temp_dir, exist_ok=True)
+
+        if files:
+            for f in files[: settings.MAX_CAPTURE_IMAGES]:
+                clean, err = read_upload(f)
+                if err:
+                    continue
+                try:
+                    fname = f"{datetime.datetime.utcnow().timestamp():.6f}_{saved}.jpg"
+                    path = os.path.join(temp_dir, fname)
+                    with open(path, "wb") as out:
+                        out.write(clean)
+                    saved += 1
+                except Exception:
+                    continue
+
+        pending.temp_image_dir = temp_dir
+        pending.face_sample_count = saved
+        pending.save()
+
+    services.log_action(
+        None,
+        "auth.register_pending",
+        target=f"PendingReg #{pending.id} ({name} / {roll})",
+        detail=f"class={school_class.label() if school_class else 'none'}, photos={saved}",
+    )
+    return Response(
+        {
+            "status": "pending",
+            "pending_id": pending.id,
+            "message": "Your registration has been submitted and is awaiting admin approval. You will be able to log in once approved.",
+        },
+        status=202,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Admin — pending student registration approvals
+# ---------------------------------------------------------------------------
+
+def _pending_reg_payload(p):
+    """Serialise a PendingRegistration for the admin UI."""
+    return {
+        "id": p.id,
+        "name": p.name,
+        "roll": p.roll,
+        "reg_no": p.reg_no or "",
+        "username": p.username,
+        "class_id": p.school_class_id,
+        "class_label": p.school_class.label() if p.school_class else "",
+        "face_sample_count": p.face_sample_count,
+        "status": p.status,
+        "csv_match_status": p.csv_match_status,
+        "csv_match_detail": p.csv_match_detail,
+        "submitted_at": p.submitted_at,
+        "reviewed_at": p.reviewed_at,
+        "reject_reason": p.reject_reason or "",
+    }
+
+
+@api_view(["GET"])
+@permission_classes([IsAdmin])
+def pending_registrations_view(request):
+    """List pending (and recently reviewed) student registration requests."""
+    status_filter = request.query_params.get("status", "pending")
+    qs = PendingRegistration.objects.select_related("school_class").order_by("-submitted_at")
+    if status_filter != "all":
+        qs = qs.filter(status=status_filter)
+    return Response({"registrations": [_pending_reg_payload(p) for p in qs]})
+
+
+def _parse_csv_rows(csv_file):
+    """Read uploaded CSV and return list-of-dicts with canonical keys."""
+    import csv as _csv
+    import difflib
+
+    try:
+        text = csv_file.read().decode("utf-8-sig", errors="replace")
+    except Exception:
+        return None, "Could not read file"
+
+    reader = _csv.DictReader(text.splitlines())
+    if reader.fieldnames is None:
+        return None, "CSV appears to be empty or has no header row"
+
+    # Map arbitrary column names to canonical keys
+    def _canon(h):
+        h2 = h.strip().lower().replace(" ", "_").replace(".", "").replace("-", "_").replace("/", "_")
+        if h2 in ("roll", "roll_no", "roll_number", "scholar_no", "enrollment_no",
+                  "enrolment_no", "sr_no", "sno", "s_no", "rollno"):
+            return "roll"
+        if h2 in ("name", "student_name", "full_name", "students_name",
+                  "candidate_name", "stud_name", "sname"):
+            return "name"
+        if h2 in ("reg_no", "registration_no", "registration_number",
+                  "reg_number", "regno", "regn"):
+            return "reg_no"
+        return h2
+
+    col_map = {h: _canon(h) for h in (reader.fieldnames or [])}
+
+    rows = []
+    for raw in reader:
+        row = {col_map.get(k, k): (v or "").strip() for k, v in raw.items()}
+        rows.append(row)
+    return rows, None
+
+
+@api_view(["POST"])
+@permission_classes([IsAdmin])
+def verify_registration_csv_view(request):
+    """Upload attendance-register CSV and match against all pending registrations.
+
+    Updates csv_match_status / csv_match_detail on each pending record and
+    returns the full updated list.
+    """
+    import difflib
+
+    csv_file = request.FILES.get("csv")
+    if not csv_file:
+        return Response({"error": "No CSV file uploaded (field name: csv)"}, status=400)
+
+    rows, err = _parse_csv_rows(csv_file)
+    if err:
+        return Response({"error": err}, status=400)
+    if not rows:
+        return Response({"error": "CSV file has no data rows"}, status=400)
+
+    pending_qs = PendingRegistration.objects.filter(
+        status=PendingRegistration.STATUS_PENDING
+    ).select_related("school_class")
+
+    updated = []
+    for pending in pending_qs:
+        p_roll = (pending.roll or "").strip().lower()
+        p_name = (pending.name or "").strip().lower()
+
+        best_status = PendingRegistration.CSV_NONE
+        best_detail = None
+        best_score = 0.0
+
+        for row in rows:
+            csv_roll = (row.get("roll") or "").strip().lower()
+            csv_name = (row.get("name") or "").strip().lower()
+
+            # Exact roll match → highest priority
+            if csv_roll and csv_roll == p_roll:
+                best_status = PendingRegistration.CSV_EXACT
+                best_detail = {k: v for k, v in row.items() if v}
+                best_score = 1.0
+                break
+
+            # Fuzzy name match as fallback
+            if csv_name and p_name:
+                sim = difflib.SequenceMatcher(None, p_name, csv_name).ratio()
+                if sim >= 0.82 and sim > best_score:
+                    best_score = sim
+                    best_status = PendingRegistration.CSV_FUZZY
+                    best_detail = {**{k: v for k, v in row.items() if v}, "_similarity": round(sim, 3)}
+
+        pending.csv_match_status = best_status
+        pending.csv_match_detail = best_detail
+        pending.save(update_fields=["csv_match_status", "csv_match_detail"])
+        updated.append(_pending_reg_payload(pending))
+
+    services.log_action(
+        request.user,
+        "admin.csv_verify",
+        target=f"Verified {len(updated)} pending registration(s) against CSV ({len(rows)} rows)",
+    )
+    return Response({"registrations": updated, "csv_rows": len(rows)})
+
+
+def _do_approve_pending(pending, reviewed_by):
+    """Core approval logic: create Student, User, Enrollments, face centroid.
+
+    Returns the created RoleUser on success, raises on error.
+    """
+    import numpy as np
+    import cv2
+    from django.contrib.auth.hashers import is_password_usable
+    from .recognition import get_face_app
+
+    User = get_user_model()
+
+    with transaction.atomic():
+        # Re-check uniqueness inside transaction
+        if User.objects.filter(username=pending.username).exists():
+            raise ValueError(f"Username '{pending.username}' is already taken.")
+
+        # Resolve class
+        school_class = pending.school_class
+        cls_name = school_class.name if school_class else ""
+        cls_sec = school_class.section if school_class else ""
+
+        # Create the Student record
+        st = Student.objects.create(
+            name=pending.name,
+            roll=pending.roll,
+            reg_no=pending.reg_no or None,
             class_text=cls_name,
             section=cls_sec,
-            school_class_id=class_id,
+            school_class=school_class,
             created_at=now_iso(),
         )
-        if class_id:
+
+        # Enroll student in the class AND every subject under that class
+        if school_class:
             Enrollment.objects.get_or_create(
-                student=st, school_class_id=class_id, defaults={"created_at": now_iso()}
+                student=st, school_class=school_class, defaults={"created_at": now_iso()}
             )
-    else:
-        if User.objects.filter(student_id=st.id).exists():
-            return Response({"error": "An account already exists for this roll number."}, status=400)
 
-    # Process face capture images if uploaded
-    files = request.FILES.getlist("images[]") or request.FILES.getlist("images")
-    if files:
-        import numpy as np
-        import cv2
-        from .recognition import get_face_app
+        # Create user with already-hashed password (skip make_password re-hash)
+        user = User(
+            username=pending.username,
+            password=pending.password_hash,
+            role="student",
+            student=st,
+            full_name=pending.name,
+            created_at=now_iso(),
+        )
+        user.save()
 
-        folder = os.path.join(DATASET_DIR, str(st.id))
-        os.makedirs(folder, exist_ok=True)
-        has_profile = os.path.exists(os.path.join(folder, "profile.jpg"))
-        saved = 0
+        Token.objects.get_or_create(user=user)
+
+        # Move temp face images to dataset/<student_id>/
+        temp_dir = pending.temp_image_dir
+        dest_dir = os.path.join(DATASET_DIR, str(st.id))
         embeddings = []
-
-        face_app = get_face_app((640, 640))
-
-        for f in files[: settings.MAX_CAPTURE_IMAGES]:
-            clean, err = read_upload(f)
-            if err:
-                continue
+        if temp_dir and os.path.isdir(temp_dir):
+            os.makedirs(dest_dir, exist_ok=True)
+            face_app = get_face_app((640, 640))
+            first_img = True
+            for fn in sorted(os.listdir(temp_dir)):
+                if not fn.lower().endswith((".jpg", ".jpeg", ".png")):
+                    continue
+                src = os.path.join(temp_dir, fn)
+                dst = os.path.join(dest_dir, fn)
+                try:
+                    shutil.move(src, dst)
+                    # Create profile from first image
+                    if first_img:
+                        _save_compact_profile(dst, os.path.join(dest_dir, "profile.jpg"))
+                        first_img = False
+                    # Extract embedding
+                    img = cv2.imread(dst)
+                    if img is not None:
+                        faces = face_app.get(img)
+                        if faces:
+                            best = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+                            embeddings.append(np.asarray(best.normed_embedding, dtype=np.float32))
+                except Exception:
+                    continue
+            # Clean up empty temp dir
             try:
-                fname = f"{datetime.datetime.utcnow().timestamp():.6f}_{saved}.jpg"
-                path = os.path.join(folder, fname)
-                with open(path, "wb") as out:
-                    out.write(clean)
+                os.rmdir(temp_dir)
+            except OSError:
+                pass
 
-                if saved == 0 and not has_profile:
-                    _save_compact_profile(path, os.path.join(folder, "profile.jpg"))
-
-                # Extract face embedding for instantaneous centroid creation
-                arr = np.frombuffer(clean, np.uint8)
-                img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-                if img is not None:
-                    detected_faces = face_app.get(img)
-                    if detected_faces:
-                        best = sorted(
-                            detected_faces,
-                            key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
-                            reverse=True,
-                        )[0]
-                        embeddings.append(np.asarray(best.normed_embedding, dtype=np.float32))
-
-                saved += 1
-            except Exception:
-                continue
-
-        # If embeddings collected, compute centroid and persist to DB immediately
+        # Compute and persist face centroid
         if embeddings:
             stack = np.stack(embeddings)
             centroid = np.mean(stack, axis=0)
             norm = np.linalg.norm(centroid)
             if norm > 1e-6:
                 centroid = centroid / norm
-            services.upsert_face_centroid(st.id, centroid, len(embeddings))
+            services.upsert_face_centroid(st.id, centroid.astype(np.float32), len(embeddings))
 
-    user = User.objects.create_user(
-        username=username,
-        password=password,
-        role="student",
-        student=st,
-        full_name=st.name,
-        created_at=now_iso(),
-    )
-    token, _ = Token.objects.get_or_create(user=user)
-    services.log_action(user, "auth.student_register", target=f"Student #{st.id} ({st.name})")
+        # Mark as approved
+        pending.status = PendingRegistration.STATUS_APPROVED
+        pending.reviewed_at = now_iso()
+        pending.reviewed_by = reviewed_by
+        pending.save()
 
-    resp = Response({"user": _user_payload(user), "student_id": st.id}, status=201)
-    resp.set_cookie(
-        settings.AUTH_COOKIE_NAME,
-        token.key,
-        max_age=settings.AUTH_COOKIE_MAX_AGE,
-        httponly=True,
-        samesite="Lax",
-        secure=settings.AUTH_COOKIE_SECURE,
-        path="/",
+    return user
+
+
+@api_view(["POST"])
+@permission_classes([IsAdmin])
+def approve_registration_view(request, reg_id):
+    """Approve a single pending registration."""
+    pending = get_object_or_404(PendingRegistration, id=reg_id)
+    if pending.status != PendingRegistration.STATUS_PENDING:
+        return Response({"error": f"Registration is already '{pending.status}', cannot approve again."}, status=400)
+
+    try:
+        user = _do_approve_pending(pending, request.user)
+    except ValueError as e:
+        return Response({"error": str(e)}, status=400)
+    except Exception as e:
+        return Response({"error": f"Approval failed: {e}"}, status=500)
+
+    services.log_action(
+        request.user,
+        "admin.registration_approved",
+        target=f"PendingReg #{pending.id} ({pending.name} / {pending.roll})",
     )
-    return resp
+    return Response({"ok": True, "student_id": user.student_id, "username": user.username})
+
+
+@api_view(["POST"])
+@permission_classes([IsAdmin])
+def reject_registration_view(request, reg_id):
+    """Reject a pending registration (with optional reason) and clean up temp images."""
+    pending = get_object_or_404(PendingRegistration, id=reg_id)
+    if pending.status != PendingRegistration.STATUS_PENDING:
+        return Response({"error": f"Registration is already '{pending.status}'."}, status=400)
+
+    reason = (request.data.get("reason") or "").strip()
+
+    # Delete temp face images
+    temp_dir = pending.temp_image_dir
+    if temp_dir and os.path.isdir(temp_dir):
+        try:
+            shutil.rmtree(temp_dir)
+        except OSError:
+            pass
+
+    pending.status = PendingRegistration.STATUS_REJECTED
+    pending.reviewed_at = now_iso()
+    pending.reviewed_by = request.user
+    pending.reject_reason = reason
+    pending.save()
+
+    services.log_action(
+        request.user,
+        "admin.registration_rejected",
+        target=f"PendingReg #{pending.id} ({pending.name} / {pending.roll})",
+        detail=reason or "(no reason given)",
+    )
+    return Response({"ok": True})
+
+
+@api_view(["POST"])
+@permission_classes([IsAdmin])
+def bulk_approve_registrations_view(request):
+    """Approve all pending registrations that matched the CSV (exact or fuzzy)."""
+    qs = PendingRegistration.objects.filter(
+        status=PendingRegistration.STATUS_PENDING,
+        csv_match_status__in=[PendingRegistration.CSV_EXACT, PendingRegistration.CSV_FUZZY],
+    ).select_related("school_class")
+
+    results = []
+    for pending in qs:
+        try:
+            user = _do_approve_pending(pending, request.user)
+            results.append({"id": pending.id, "name": pending.name, "ok": True})
+            services.log_action(
+                request.user,
+                "admin.registration_approved",
+                target=f"PendingReg #{pending.id} ({pending.name} / {pending.roll}) [bulk]",
+            )
+        except Exception as e:
+            results.append({"id": pending.id, "name": pending.name, "ok": False, "error": str(e)})
+
+    approved = sum(1 for r in results if r["ok"])
+    return Response({"approved": approved, "total": len(results), "results": results})
 
 
 @api_view(["POST"])

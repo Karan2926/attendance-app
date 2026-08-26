@@ -16,7 +16,6 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 export default function Register() {
   usePageTitle("Student Registration");
   const navigate = useNavigate();
-
   // Step 1: Form state
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
@@ -29,6 +28,8 @@ export default function Register() {
   const [classes, setClasses] = useState([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Pending success state
+  const [pendingResult, setPendingResult] = useState(null); // { pending_id, name }
 
   // Step 2: Camera & Quality state
   const [capturedBlobs, setCapturedBlobs] = useState([]);
@@ -149,9 +150,15 @@ export default function Register() {
     });
 
     try {
-      await postFormData("/auth/register", fd);
+      const data = await postFormData("/auth/register", fd);
       stop();
-      navigate("/my_attendance");
+      // Backend now returns 202 pending instead of 201 with a cookie
+      if (data.status === "pending") {
+        setPendingResult({ pending_id: data.pending_id, name: name.trim() });
+      } else {
+        // Fallback: old auto-approve path (shouldn't happen in normal flow)
+        navigate("/my_attendance");
+      }
     } catch (err) {
       setError(err.message || "Registration failed. Please try again.");
     } finally {
@@ -161,6 +168,51 @@ export default function Register() {
 
   return (
     <div className="auth-shell">
+
+      {/* ── Pending approval success screen ─────────────────────────── */}
+      {pendingResult && (
+        <div className="auth-panel" style={{ maxWidth: "520px", textAlign: "center" }}>
+          <div className="mb-3">
+            <Brand />
+          </div>
+          {/* Big checkmark */}
+          <div style={{
+            width: 80, height: 80, borderRadius: "50%",
+            background: "linear-gradient(135deg, #0EA5A4 0%, #0D9488 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            margin: "0 auto 1.5rem",
+            boxShadow: "0 8px 24px rgba(14,165,164,0.35)",
+          }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <h1 className="auth-brand" style={{ fontSize: "1.6rem" }}>Registration Submitted!</h1>
+          <p className="panel-copy mt-2" style={{ color: "var(--ink-soft)" }}>
+            Your registration is awaiting admin approval. Once approved, you'll be able to log in
+            with your chosen username and password.
+          </p>
+          <div className="card2 mt-3" style={{ background: "#F0FDFA", borderColor: "#99F6E4", textAlign: "left" }}>
+            <div className="mono" style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginBottom: "0.5rem" }}>REGISTRATION DETAILS</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              <div><span style={{ fontWeight: 600, minWidth: 120, display: "inline-block" }}>Name:</span> {pendingResult.name}</div>
+              <div><span style={{ fontWeight: 600, minWidth: 120, display: "inline-block" }}>Reference ID:</span>
+                <span className="mono" style={{ fontWeight: 700, color: "var(--teal)" }}> #{pendingResult.pending_id}</span>
+              </div>
+              <div><span style={{ fontWeight: 600, minWidth: 120, display: "inline-block" }}>Status:</span>
+                <span style={{ color: "#D97706", fontWeight: 600 }}> ⏳ Pending Admin Approval</span>
+              </div>
+            </div>
+          </div>
+          <p className="mono mt-3" style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+            Keep your Reference ID <strong>#{pendingResult.pending_id}</strong> handy. Contact your administrator if approval takes more than 24 hours.
+          </p>
+          <Link to="/login" className="btn2 btn2-outline w-100 mt-3">Go to Login</Link>
+        </div>
+      )}
+
+      {/* ── Normal registration form ──────────────────────────────────── */}
+      {!pendingResult && (
       <div className="auth-panel" style={{ maxWidth: step === 2 ? "680px" : "480px", transition: "all 0.3s ease" }}>
         <div className="mb-3">
           <Brand />
@@ -195,7 +247,7 @@ export default function Register() {
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <label className="label2">Registration No. (Optional)</label>
+            <label className="label2">Registration No. <span style={{ color: "var(--ink-soft)", fontWeight: 400 }}>(Optional)</span></label>
                 <input
                   className="input2 mb-3"
                   value={regNo}
@@ -207,7 +259,7 @@ export default function Register() {
 
             <label className="label2">Class &amp; Section *</label>
             <select
-              className="input2 mb-3"
+              className="input2 mb-1"
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
               required
@@ -219,6 +271,14 @@ export default function Register() {
                 </option>
               ))}
             </select>
+            {classId && (() => {
+              const cls = classes.find((c) => String(c.id) === String(classId));
+              return cls?.subject_count > 0 ? (
+                <div className="mono mb-3" style={{ fontSize: "0.78rem", color: "var(--teal)" }}>
+                  ✓ You'll be enrolled in all {cls.subject_count} subject{cls.subject_count !== 1 ? "s" : ""} of this class automatically
+                </div>
+              ) : <div className="mb-3" />;
+            })()}
 
             <div className="d-flex gap-2">
               <div style={{ flex: 1 }}>
@@ -371,6 +431,7 @@ export default function Register() {
           </Link>
         </div>
       </div>
+      )}
     </div>
   );
 }
