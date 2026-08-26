@@ -175,8 +175,6 @@ def register_view(request):
         return Response({"error": "Public registration is currently disabled by administrator."}, status=403)
 
     data = request.data
-    username = (data.get("username") or "").strip()
-    password = data.get("password") or ""
     roll = (data.get("roll") or "").strip()
     name = (data.get("name") or "").strip()
     reg_no = (data.get("reg_no") or "").strip()
@@ -188,23 +186,33 @@ def register_view(request):
         return Response({"error": "Invalid invite code. Ask your teacher for the registration code."}, status=400)
 
     # Required field validation
-    if not username or not password or not roll or not name:
-        return Response({"error": "Full name, username, password, and roll number are required."}, status=400)
-    if len(password) < 8:
-        return Response({"error": "Password must be at least 8 characters long."}, status=400)
-
-    User = get_user_model()
-    # Check username is not already taken (active account or another pending request)
-    if User.objects.filter(username=username).exists():
-        return Response({"error": "That username is already taken. Please choose another."}, status=400)
-    if PendingRegistration.objects.filter(username=username, status=PendingRegistration.STATUS_PENDING).exists():
-        return Response({"error": "A pending registration with that username already exists."}, status=400)
+    if not roll or not name:
+        return Response({"error": "Full name and roll number are required."}, status=400)
 
     # Check roll number is not already registered or pending
+    User = get_user_model()
     if Student.objects.filter(roll=roll).exists() and User.objects.filter(student__roll=roll).exists():
         return Response({"error": "An account already exists for this roll number."}, status=400)
     if PendingRegistration.objects.filter(roll=roll, status=PendingRegistration.STATUS_PENDING).exists():
-        return Response({"error": "A pending registration already exists for this roll number. Please wait for admin approval."}, status=400)
+        return Response({"error": "A pending registration already exists for this roll number. Please wait for mentor approval."}, status=400)
+
+    # Generate a safe, unique username based on roll number
+    import re
+    import uuid
+    import secrets
+    clean_username = re.sub(r'[^a-zA-Z0-9]', '', roll).lower()
+    if not clean_username:
+        clean_username = f"student_{uuid.uuid4().hex[:8]}"
+
+    base_username = clean_username
+    suffix = 1
+    while User.objects.filter(username=clean_username).exists() or PendingRegistration.objects.filter(username=clean_username, status=PendingRegistration.STATUS_PENDING).exists():
+        clean_username = f"{base_username}{suffix}"
+        suffix += 1
+    username = clean_username
+
+    # Generate a random password since student login is not used
+    password = secrets.token_urlsafe(16)
 
     # Validate class_id
     school_class = None

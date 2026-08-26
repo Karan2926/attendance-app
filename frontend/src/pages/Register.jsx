@@ -22,8 +22,6 @@ export default function Register() {
   const [roll, setRoll] = useState("");
   const [regNo, setRegNo] = useState("");
   const [classId, setClassId] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [classes, setClasses] = useState([]);
   const [error, setError] = useState("");
@@ -67,12 +65,8 @@ export default function Register() {
   function validateStep1(e) {
     e.preventDefault();
     setError("");
-    if (!name.trim() || !roll.trim() || !classId || !username.trim() || !password) {
+    if (!name.trim() || !roll.trim() || !classId) {
       setError("Please fill in all required fields.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long.");
       return;
     }
     setStep(2);
@@ -152,8 +146,6 @@ export default function Register() {
     fd.append("roll", roll.trim());
     fd.append("reg_no", regNo.trim());
     fd.append("class_id", classId);
-    fd.append("username", username.trim());
-    fd.append("password", password);
     if (inviteCode) fd.append("invite_code", inviteCode.trim());
 
     capturedBlobs.forEach((b, i) => {
@@ -168,7 +160,7 @@ export default function Register() {
         setPendingResult({ pending_id: data.pending_id, name: name.trim() });
       } else {
         // Fallback: old auto-approve path (shouldn't happen in normal flow)
-        navigate("/my_attendance");
+        navigate("/login");
       }
     } catch (err) {
       setError(err.message || "Registration failed. Please try again.");
@@ -200,8 +192,7 @@ export default function Register() {
           </div>
           <h1 className="auth-brand" style={{ fontSize: "1.6rem" }}>Registration Submitted!</h1>
           <p className="panel-copy mt-2" style={{ color: "var(--ink-soft)" }}>
-            Your registration is awaiting admin approval. Once approved, you'll be able to log in
-            with your chosen username and password.
+            Your registration is awaiting mentor approval. Once approved, your student face profile will be registered and active for class attendance.
           </p>
           <div className="card2 mt-3" style={{ background: "#F0FDFA", borderColor: "#99F6E4", textAlign: "left" }}>
             <div className="mono" style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginBottom: "0.5rem" }}>REGISTRATION DETAILS</div>
@@ -211,12 +202,12 @@ export default function Register() {
                 <span className="mono" style={{ fontWeight: 700, color: "var(--teal)" }}> #{pendingResult.pending_id}</span>
               </div>
               <div><span style={{ fontWeight: 600, minWidth: 120, display: "inline-block" }}>Status:</span>
-                <span style={{ color: "#D97706", fontWeight: 600 }}> ⏳ Pending Admin Approval</span>
+                <span style={{ color: "#D97706", fontWeight: 600 }}> ⏳ Pending Mentor Approval</span>
               </div>
             </div>
           </div>
           <p className="mono mt-3" style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-            Keep your Reference ID <strong>#{pendingResult.pending_id}</strong> handy. Contact your administrator if approval takes more than 24 hours.
+            Keep your Reference ID <strong>#{pendingResult.pending_id}</strong> handy. Contact your mentor if approval takes more than 24 hours.
           </p>
           <Link to="/login" className="btn2 btn2-outline w-100 mt-3">Go to Login</Link>
         </div>
@@ -327,31 +318,6 @@ export default function Register() {
                 </div>
               );
             })()}
-
-            <div className="d-flex gap-2">
-              <div style={{ flex: 1 }}>
-                <label className="label2">Choose Username *</label>
-                <input
-                  className="input2 mb-3"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  placeholder="e.g. karan29"
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label className="label2">Choose Password *</label>
-                <input
-                  className="input2 mb-3"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength="8"
-                  placeholder="Min. 8 characters"
-                />
-              </div>
-            </div>
 
             <label className="label2">Registration Code (Optional)</label>
             <input
