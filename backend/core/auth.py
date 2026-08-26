@@ -17,17 +17,22 @@ from rest_framework.exceptions import AuthenticationFailed
 
 class TokenCookieAuthentication(TokenAuthentication):
     def authenticate(self, request):
-        user_token = super().authenticate(request)
-        if user_token is not None:
-            return user_token
+        # 1. Try standard Authorization header (for API clients / tests)
+        try:
+            user_token = super().authenticate(request)
+            if user_token is not None:
+                return user_token
+        except AuthenticationFailed:
+            pass
+
+        # 2. Fall back to HttpOnly cookie (for web SPA)
         token_key = request.COOKIES.get(settings.AUTH_COOKIE_NAME)
         if not token_key:
             return None
         try:
             return self.authenticate_credentials(token_key)
         except AuthenticationFailed:
-            # Stale or invalid cookie (e.g. user deleted or token expired).
-            # Return None so request continues as AnonymousUser. Public endpoints
-            # (like /auth/login) can run, and protected endpoints will return a clean 401.
+            # Stale or invalid cookie/token — ignore so request proceeds as AnonymousUser.
+            # Public routes (like /auth/login) can run, protected routes return clean 401/403.
             return None
 
