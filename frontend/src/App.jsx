@@ -15,6 +15,7 @@ import Analytics from "./pages/Analytics";
 import Copilot from "./pages/Copilot";
 import Admin from "./pages/Admin";
 import RegisterExport from "./pages/RegisterExport";
+import MentorApprovals from "./pages/MentorApprovals";
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -112,6 +113,14 @@ export default function App() {
             element={
               <RequireRole roles={["teacher"]}>
                 <ManageStudents />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/mentor_approvals"
+            element={
+              <RequireRole roles={["teacher"]}>
+                <MentorApprovals />
               </RequireRole>
             }
           />

@@ -63,6 +63,9 @@ export default function Layout({ children }) {
               <NavLink to="/manage_students" className={navLinkClass}>
                 Manage Students
               </NavLink>
+              <NavLink to="/mentor_approvals" className={navLinkClass}>
+                Section Mentor Portal
+              </NavLink>
               <NavLink to="/mark_attendance" className={navLinkClass}>
                 Mark Attendance
               </NavLink>
