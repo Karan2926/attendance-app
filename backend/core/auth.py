@@ -12,6 +12,7 @@ for session cookies.
 
 from django.conf import settings
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.exceptions import AuthenticationFailed
 
 
 class TokenCookieAuthentication(TokenAuthentication):
@@ -22,4 +23,11 @@ class TokenCookieAuthentication(TokenAuthentication):
         token_key = request.COOKIES.get(settings.AUTH_COOKIE_NAME)
         if not token_key:
             return None
-        return self.authenticate_credentials(token_key)
+        try:
+            return self.authenticate_credentials(token_key)
+        except AuthenticationFailed:
+            # Stale or invalid cookie (e.g. user deleted or token expired).
+            # Return None so request continues as AnonymousUser. Public endpoints
+            # (like /auth/login) can run, and protected endpoints will return a clean 401.
+            return None
+
