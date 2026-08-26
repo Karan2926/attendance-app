@@ -43,12 +43,23 @@ export default function Register() {
     { width: 1280, height: 720, defaultFacing: "user" }
   );
 
+  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [classLoadError, setClassLoadError] = useState("");
+
   // Load public classes for dropdown
   useEffect(() => {
+    setLoadingClasses(true);
+    setClassLoadError("");
     api
       .get("/public_classes")
-      .then((d) => setClasses(d.classes || []))
-      .catch(() => {});
+      .then((d) => {
+        setClasses(d.classes || []);
+        setLoadingClasses(false);
+      })
+      .catch((err) => {
+        setClassLoadError(err.message || "Failed to load classes");
+        setLoadingClasses(false);
+      });
   }, []);
 
   useEffect(() => () => stop(), [stop]);
@@ -263,14 +274,36 @@ export default function Register() {
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
               required
+              disabled={loadingClasses || classes.length === 0}
             >
-              <option value="">Select your class…</option>
+              <option value="">
+                {loadingClasses
+                  ? "Loading classes…"
+                  : classes.length === 0
+                  ? "No active classes available"
+                  : "Select your class…"}
+              </option>
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.label || `${c.name} — Sec ${c.section}`}
                 </option>
               ))}
             </select>
+            {loadingClasses && (
+              <div className="mono mb-3" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                ⏳ Loading available classes…
+              </div>
+            )}
+            {classLoadError && (
+              <div className="mono mb-3" style={{ fontSize: "0.78rem", color: "#DC2626" }}>
+                ⚠️ {classLoadError}
+              </div>
+            )}
+            {!loadingClasses && !classLoadError && classes.length === 0 && (
+              <div className="mono mb-3" style={{ fontSize: "0.78rem", color: "#D97706" }}>
+                ⚠️ No classes available yet. Ask your administrator to add classes in the Admin Console.
+              </div>
+            )}
             {classId && (() => {
               const cls = classes.find((c) => String(c.id) === String(classId));
               if (!cls) return <div className="mb-3" />;
