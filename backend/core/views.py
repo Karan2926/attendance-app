@@ -2560,10 +2560,13 @@ def event_checkin_view(request, event_id):
             }, status=400)
         
         dist = _haversine_distance(lat, lng, event.latitude, event.longitude)
-        if dist > event.radius:
+        # Deduct accuracy to account for indoor GPS error margin
+        effective_dist = max(0.0, dist - (acc or 0.0))
+        if effective_dist > event.radius:
             return Response({
-                "error": f"Check-in rejected. You are {int(dist)}m away from the venue, but check-in is only allowed within {event.radius}m."
+                "error": f"Check-in rejected. You are {int(dist)}m away from the venue (Your coordinates: {lat:.6f}, {lng:.6f}; accuracy: ±{int(acc or 0)}m), but check-in is only allowed within {event.radius}m of the event center."
             }, status=400)
+
 
     # ── Face recognition ───────────────────────────────────────────────────
 
