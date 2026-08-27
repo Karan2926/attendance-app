@@ -2214,6 +2214,7 @@ def _event_payload(event):
 
 
 @api_view(["GET", "POST"])
+@permission_classes([AllowAny])
 def event_list_create_view(request):
     """
     GET  — public: list all events.
@@ -2257,6 +2258,7 @@ def event_list_create_view(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def event_active_view(request):
     """Public: return the currently active event (or null)."""
     event = EventSession.objects.filter(is_active=True).order_by("-id").first()
@@ -2266,6 +2268,7 @@ def event_active_view(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def event_detail_view(request, event_id):
     """Public: get event details by ID."""
     event = EventSession.objects.filter(id=event_id).first()
