@@ -53,7 +53,8 @@ export default function EventCheckin() {
       canvas.getContext("2d").drawImage(video, 0, 0);
       const blob = await new Promise(res => canvas.toBlob(res, "image/jpeg", 0.92));
       const fd = new FormData();
-      fd.append("images[]", blob, "face.jpg");
+      fd.append("image", blob, "face.jpg");
+
       if (location) {
         fd.append("latitude", location.latitude);
         fd.append("longitude", location.longitude);
