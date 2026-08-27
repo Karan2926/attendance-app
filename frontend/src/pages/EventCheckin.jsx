@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { api, postFormData } from "../api";
-import useCamera from "../components/useCamera";
+import { useCamera } from "../components/useCamera";
 import Brand from "../components/Brand";
 
 export default function EventCheckin() {
