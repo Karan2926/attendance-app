@@ -2337,6 +2337,7 @@ def event_attendance_list_view(request, event_id):
             "checked_in_at": r.checked_in_at,
             "latitude": r.latitude,
             "longitude": r.longitude,
+            "location_name": r.location_name or (f"{r.latitude:.5f}, {r.longitude:.5f}" if r.latitude else "Unknown"),
             "location_accuracy": r.location_accuracy,
             "face_confidence": round(r.face_confidence * 100, 1) if r.face_confidence else None,
         })
@@ -2363,7 +2364,7 @@ def event_attendance_csv_view(request, event_id):
     buf = StringIO()
     writer = _csv.writer(buf)
     writer.writerow(["S.No.", "Name", "Roll No.", "Reg No.", "Class", "Section",
-                     "Check-In Time", "Latitude", "Longitude", "Accuracy (m)", "Face Confidence (%)"])
+                     "Check-In Time", "Location / Place", "Latitude", "Longitude", "Accuracy (m)", "Face Confidence (%)"])
     for i, r in enumerate(records, 1):
         st = r.student
         writer.writerow([
@@ -2374,6 +2375,7 @@ def event_attendance_csv_view(request, event_id):
             st.class_text or (st.school_class.name if st.school_class else ""),
             st.section or (st.school_class.section if st.school_class else ""),
             r.checked_in_at,
+            r.location_name or (f"{r.latitude:.5f}, {r.longitude:.5f}" if r.latitude else "Unknown"),
             r.latitude or "",
             r.longitude or "",
             round(r.location_accuracy, 1) if r.location_accuracy else "",
@@ -2385,6 +2387,51 @@ def event_attendance_csv_view(request, event_id):
     fname = f"event_attendance_{event.name.replace(' ', '_')}_{event.event_date}.csv"
     resp["Content-Disposition"] = f'attachment; filename="{fname}"'
     return resp
+
+
+
+def _reverse_geocode(lat, lng):
+    if lat is None or lng is None:
+        return None
+    import requests
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lng}&zoom=18&addressdetails=1"
+        headers = {
+            "User-Agent": "ITM-Attendance-App/1.0 (karanbhadouriya2926@gmail.com)"
+        }
+        resp = requests.get(url, headers=headers, timeout=2.5)
+        if resp.status_code == 200:
+            data = resp.json()
+            address = data.get("address", {})
+            place = (
+                address.get("amenity") or 
+                address.get("building") or 
+                address.get("university") or 
+                address.get("college") or 
+                address.get("office") or 
+                address.get("shop") or 
+                address.get("tourism")
+            )
+            road = address.get("road")
+            suburb = address.get("suburb") or address.get("neighbourhood")
+            city = address.get("city") or address.get("town") or address.get("village")
+            
+            parts = []
+            if place:
+                parts.append(place)
+            if road:
+                parts.append(road)
+            if suburb:
+                parts.append(suburb)
+            if city:
+                parts.append(city)
+                
+            if parts:
+                return ", ".join(parts)
+            return data.get("display_name")
+    except Exception:
+        pass
+    return None
 
 
 @api_view(["POST"])
@@ -2496,6 +2543,7 @@ def event_checkin_view(request, event_id):
 
     # ── Record attendance ──────────────────────────────────────────────────
     checked_in_at = now_iso()
+    loc_name = _reverse_geocode(lat, lng)
     EventAttendance.objects.create(
         event=event,
         student=student,
@@ -2505,6 +2553,7 @@ def event_checkin_view(request, event_id):
         location_accuracy=acc,
         photo_path=photo_path,
         face_confidence=conf,
+        location_name=loc_name,
     )
 
     services.log_action(None, "event.checkin", target=f"Student #{student.id} → Event #{event.id}")
@@ -2519,7 +2568,9 @@ def event_checkin_view(request, event_id):
         "checked_in_at": checked_in_at,
         "latitude": lat,
         "longitude": lng,
+        "location_name": loc_name or (f"{lat:.5f}, {lng:.5f}" if lat else "Unknown"),
         "event_name": event.name,
         "face_confidence": round(conf * 100, 1),
     })
+
 

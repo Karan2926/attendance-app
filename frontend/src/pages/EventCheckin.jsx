@@ -117,11 +117,12 @@ export default function EventCheckin() {
                 <div style={{display:"flex",gap:"0.5rem"}}>
                   <span style={{fontWeight:600,minWidth:120,fontSize:"0.88rem"}}>Location</span>
                   <span style={{fontSize:"0.85rem"}}>
-                    {Number(result.latitude).toFixed(5)}, {Number(result.longitude).toFixed(5)}
+                    {result.location_name || `${Number(result.latitude).toFixed(5)}, ${Number(result.longitude).toFixed(5)}`}
                     {mapsUrl && <a href={mapsUrl} target="_blank" rel="noreferrer" style={{marginLeft:"0.5rem",color:"var(--teal)",fontSize:"0.8rem"}}>Open Map</a>}
                   </span>
                 </div>
               )}
+
             </div>
           </div>
           <div className="mono mt-3" style={{fontSize:"0.8rem",color:"var(--ink-soft)"}}>Thank you! Your attendance has been recorded.</div>

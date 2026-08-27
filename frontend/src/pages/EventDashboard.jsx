@@ -223,8 +223,16 @@ export default function EventDashboard() {
                           <td>{a.section || "--"}</td>
                           <td className="mono" style={{fontSize:"0.82rem"}}>{time}</td>
                           <td>
-                            {mapsUrl ? <a href={mapsUrl} target="_blank" rel="noreferrer" style={{color:"var(--teal)",fontSize:"0.8rem"}}>View Map</a> : <span style={{color:"var(--ink-soft)"}}>--</span>}
+                            {a.location_name ? (
+                              <div style={{fontSize:"0.82rem", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}} title={a.location_name}>
+                                {a.location_name}
+                                {mapsUrl && <a href={mapsUrl} target="_blank" rel="noreferrer" style={{marginLeft:"0.5rem",color:"var(--teal)",fontSize:"0.78rem"}}>📍 Map</a>}
+                              </div>
+                            ) : (
+                              <span style={{color:"var(--ink-soft)"}}>--</span>
+                            )}
                           </td>
+
                           <td className="mono" style={{fontSize:"0.82rem"}}>{a.face_confidence ? a.face_confidence + "%" : "--"}</td>
                         </tr>
                       );

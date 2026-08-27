@@ -344,7 +344,9 @@ class EventAttendance(models.Model):
     location_accuracy = models.FloatField(null=True, blank=True)
     photo_path = models.TextField(null=True, blank=True)
     face_confidence = models.FloatField(null=True, blank=True)
+    location_name = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = "event_attendance"
         unique_together = ("event", "student")
+
