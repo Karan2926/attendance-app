@@ -30,18 +30,37 @@ export default function EventCheckin() {
 
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) { setLocationStatus("denied"); return; }
+    
+    const options = { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 };
+    
     navigator.geolocation.getCurrentPosition(
       pos => {
         setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy });
         setLocationStatus("ok");
       },
-      () => setLocationStatus("denied"),
-      { enableHighAccuracy: true, timeout: 10000 }
+      () => {
+        // Fallback to low-accuracy/network localization if high-accuracy timed out or failed (e.g. indoors)
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy });
+            setLocationStatus("ok");
+          },
+          () => setLocationStatus("denied"),
+          { enableHighAccuracy: false, timeout: 5000 }
+        );
+      },
+      options
     );
   }, []);
 
-  function enterScan() { setStep("scan"); setError(""); start(); requestLocation(); }
+  // Request location immediately on component mount to give browser time to resolve it
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
+
+  function enterScan() { setStep("scan"); setError(""); start(); if (locationStatus === "denied") requestLocation(); }
   useEffect(() => () => stop(), [stop]);
+
 
   async function captureAndSubmit() {
     if (!videoRef.current || scanning) return;
@@ -192,9 +211,10 @@ export default function EventCheckin() {
       {error && <div className="card2 mb-3" style={{background:"#FEF2F2",borderColor:"#FECACA",color:"#DC2626",fontSize:"0.88rem"}}>{error}</div>}
       <div className="d-flex gap-2">
         <button className="btn2 btn2-outline" onClick={()=>{stop();setStep("info");setError("");setScanning(false);}}>Back</button>
-        <button className="btn2 btn2-primary" style={{flex:1}} onClick={captureAndSubmit} disabled={scanning||!live}>
-          {scanning?"Scanning...":"Scan and Check In"}
+        <button className="btn2 btn2-primary" style={{flex:1}} onClick={captureAndSubmit} disabled={scanning||!live||locationStatus==="pending"}>
+          {locationStatus==="pending" ? "Waiting for GPS..." : scanning ? "Scanning..." : "Scan and Check In"}
         </button>
+
       </div>
       <div className="mono mt-3" style={{fontSize:"0.78rem",color:"var(--ink-soft)",textAlign:"center"}}>Make sure your face is clearly visible in good lighting</div>
     </div></div>
