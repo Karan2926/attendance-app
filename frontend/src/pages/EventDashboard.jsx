@@ -10,7 +10,8 @@ export default function EventDashboard() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [toggling, setToggling] = useState(false);
-  const [form, setForm] = useState({ name: "", venue: "", description: "", event_date: "", start_time: "", end_time: "" });
+  const [form, setForm] = useState({ name: "", venue: "ITM University, Gwalior", description: "", event_date: "", start_time: "", end_time: "", radius: 300, latitude: "", longitude: "" });
+
   const [formError, setFormError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [tab, setTab] = useState("events");
@@ -33,8 +34,9 @@ export default function EventDashboard() {
     e.preventDefault(); setFormError(""); setCreating(true);
     try {
       await api.post("/events", form);
-      setForm({ name: "", venue: "", description: "", event_date: "", start_time: "", end_time: "" });
+      setForm({ name: "", venue: "ITM University, Gwalior", description: "", event_date: "", start_time: "", end_time: "", radius: 300, latitude: "", longitude: "" });
       setShowCreate(false);
+
       loadEvents();
     } catch (err) { setFormError(err.message || "Failed to create event"); }
     finally { setCreating(false); }
@@ -112,9 +114,38 @@ export default function EventDashboard() {
             <form onSubmit={createEvent}>
               <label className="label2">Event Name *</label>
               <input className="input2 mb-2" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="IKS Cultural Program 2025" required/>
-              <label className="label2">Venue</label>
-              <input className="input2 mb-2" value={form.venue} onChange={e=>setForm({...form,venue:e.target.value})} placeholder="Main Auditorium"/>
+              <div className="d-flex gap-2">
+                <div style={{flex:2}}>
+                  <label className="label2">Venue *</label>
+                  <input className="input2 mb-2" value={form.venue} onChange={e=>setForm({...form,venue:e.target.value})} placeholder="ITM University, Gwalior" required/>
+                </div>
+                <div style={{flex:1}}>
+                  <label className="label2">Geofence Radius (meters) *</label>
+                  <input className="input2 mb-2" type="number" min="50" max="5000" value={form.radius} onChange={e=>setForm({...form,radius:e.target.value})} required/>
+                </div>
+              </div>
+
+              <div style={{marginTop: "0.2rem", marginBottom: "1rem"}}>
+                <details style={{fontSize: "0.85rem", color: "var(--ink-soft)"}}>
+                  <summary style={{cursor: "pointer", fontWeight: 600, color: "var(--teal)"}}>🗺️ Advanced Geofencing GPS coordinates (Optional)</summary>
+                  <div className="d-flex gap-2 mt-2">
+                    <div style={{flex:1}}>
+                      <label className="label2">Custom Latitude</label>
+                      <input className="input2" type="number" step="any" value={form.latitude} onChange={e=>setForm({...form,latitude:e.target.value})} placeholder="e.g. 26.0607"/>
+                    </div>
+                    <div style={{flex:1}}>
+                      <label className="label2">Custom Longitude</label>
+                      <input className="input2" type="number" step="any" value={form.longitude} onChange={e=>setForm({...form,longitude:e.target.value})} placeholder="e.g. 78.1396"/>
+                    </div>
+                  </div>
+                  <small style={{display: "block", marginTop: "0.4rem", color: "var(--ink-soft)", lineHeight: 1.3}}>
+                    Leave coordinates blank to automatically lookup coordinates via OpenStreetMap (defaults to ITM University campus coordinates: 26.0607, 78.1396).
+                  </small>
+                </details>
+              </div>
+
               <label className="label2">Description</label>
+
               <textarea className="input2 mb-2" rows={2} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Brief description of the event (optional)"/>
               <div className="d-flex gap-2">
                 <div style={{flex:1}}>

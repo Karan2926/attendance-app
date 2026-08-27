@@ -2208,9 +2208,39 @@ def _event_payload(event):
         "start_time": str(event.start_time)[:5],
         "end_time": str(event.end_time)[:5],
         "is_active": event.is_active,
+        "latitude": event.latitude,
+        "longitude": event.longitude,
+        "radius": event.radius,
         "created_at": event.created_at,
         "attendance_count": count,
     }
+
+
+
+def _geocode_address(address):
+    """Call Nominatim API to get coordinates of an address/venue."""
+    if not address:
+        return None, None
+    
+    # ITM University Gwalior default fallback
+    addr_lower = address.lower()
+    if "itm" in addr_lower or "university" in addr_lower:
+        return 26.0607, 78.1396
+
+    import requests
+    try:
+        url = f"https://nominatim.openstreetmap.org/search?q={address}&format=json&limit=1"
+        headers = {
+            "User-Agent": "ITM-Attendance-App/1.0 (karanbhadouriya2926@gmail.com)"
+        }
+        resp = requests.get(url, headers=headers, timeout=3.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data:
+                return float(data[0]["lat"]), float(data[0]["lon"])
+    except Exception:
+        pass
+    return 26.0607, 78.1396 # Fallback to ITM University Gwalior
 
 
 @api_view(["GET", "POST"])
@@ -2235,9 +2265,28 @@ def event_list_create_view(request):
     event_date = (data.get("event_date") or "").strip()
     start_time = (data.get("start_time") or "").strip()
     end_time = (data.get("end_time") or "").strip()
+    
+    lat_val = data.get("latitude")
+    lng_val = data.get("longitude")
+    radius_val = data.get("radius")
 
     if not name or not event_date or not start_time or not end_time:
         return Response({"error": "name, event_date, start_time, end_time are required"}, status=400)
+
+    # Automatically resolve coordinates from venue name if not manually provided
+    if not lat_val or not lng_val:
+        lat, lng = _geocode_address(venue or "ITM University Gwalior")
+    else:
+        try:
+            lat = float(lat_val)
+            lng = float(lng_val)
+        except (TypeError, ValueError):
+            lat, lng = 26.0607, 78.1396
+
+    try:
+        radius = int(radius_val) if radius_val else 300
+    except (TypeError, ValueError):
+        radius = 300
 
     # Deactivate any existing active event before creating a new one
     EventSession.objects.filter(is_active=True).update(is_active=False)
@@ -2249,12 +2298,16 @@ def event_list_create_view(request):
         event_date=event_date,
         start_time=start_time,
         end_time=end_time,
+        latitude=lat,
+        longitude=lng,
+        radius=radius,
         is_active=True,
         created_by=request.user,
         created_at=now_iso(),
     )
     services.log_action(request.user, "event.created", target=f"Event #{event.id}: {name}")
     return Response(_event_payload(event), status=201)
+
 
 
 @api_view(["GET"])
@@ -2437,6 +2490,18 @@ def _reverse_geocode(lat, lng):
     return None
 
 
+def _haversine_distance(lat1, lon1, lat2, lon2):
+    import math
+    R = 6371.0 # Earth radius in km
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2 + 
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * 
+         math.sin(dlon / 2) ** 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c * 1000.0 # Distance in meters
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @rate_limit(lambda r: f"event_checkin_{r.META.get('REMOTE_ADDR')}", 20, 60)
@@ -2485,7 +2550,21 @@ def event_checkin_view(request, event_id):
     except (TypeError, ValueError):
         lat = lng = acc = None
 
+    # ── Geofencing check ───────────────────────────────────────────────────
+    if event.latitude is not None and event.longitude is not None:
+        if lat is None or lng is None:
+            return Response({
+                "error": "Location access is required to check in to this event. Please allow location access in your browser."
+            }, status=400)
+        
+        dist = _haversine_distance(lat, lng, event.latitude, event.longitude)
+        if dist > event.radius:
+            return Response({
+                "error": f"Check-in rejected. You are {int(dist)}m away from the venue, but check-in is only allowed within {event.radius}m."
+            }, status=400)
+
     # ── Face recognition ───────────────────────────────────────────────────
+
     try:
         from .recognition import (
             extract_face_for_image,

@@ -310,6 +310,9 @@ class EventSession(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
     is_active = models.BooleanField(default=False)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    radius = models.IntegerField(default=300) # Geofencing radius in meters
     created_by = models.ForeignKey(
         "RoleUser",
         null=True,
@@ -321,6 +324,7 @@ class EventSession(models.Model):
 
     class Meta:
         db_table = "event_sessions"
+
 
     def __str__(self):
         return f"{self.name} ({self.event_date})"
