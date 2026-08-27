@@ -944,7 +944,8 @@ def admin_overview_view(request):
         get_user_model()
         .objects.filter(role__in=["teacher", "mentor", "event_organizer"])
         .order_by("username")
-        .values("id", "username", "full_name", "role", "created_at")
+        .values("id", "username", "full_name", "role", "created_at", "is_active")
+
     )
     assignments = list(
         TeacherAssignment.objects.select_related("user", "school_class", "subject")
@@ -1052,9 +1053,10 @@ def update_teacher_view(request, teacher_id):
     """Activate / deactivate a teacher account (soft removal)."""
     if request.user.id == teacher_id:
         return Response({"error": "You cannot modify your own account"}, status=400)
-    user = get_user_model().objects.filter(id=teacher_id, role="teacher").first()
+    user = get_user_model().objects.filter(id=teacher_id, role__in=["teacher", "mentor", "event_organizer"]).first()
     if not user:
-        return Response({"error": "teacher not found"}, status=404)
+        return Response({"error": "user not found"}, status=404)
+
     active = request.data.get("active")
     if active is None:
         return Response({"error": "active (bool) required"}, status=400)
