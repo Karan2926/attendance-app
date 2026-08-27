@@ -82,7 +82,9 @@ urlpatterns = [
     path("events", views.event_list_create_view),
     path("events/active", views.event_active_view),
     path("events/<int:event_id>", views.event_detail_view),
+    path("events/<int:event_id>/update", views.event_update_view),
     path("events/<int:event_id>/delete", views.event_delete_view),
+
     path("events/<int:event_id>/toggle", views.event_toggle_view),
     path("events/<int:event_id>/checkin", views.event_checkin_view),
     path("events/<int:event_id>/attendance", views.event_attendance_list_view),

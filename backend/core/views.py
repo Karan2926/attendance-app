@@ -2345,6 +2345,59 @@ def event_delete_view(request, event_id):
     return Response({"success": True})
 
 
+@api_view(["PUT"])
+@permission_classes([IsEventOrganizerOrAdmin])
+def event_update_view(request, event_id):
+    """Update event session details."""
+    event = EventSession.objects.filter(id=event_id).first()
+    if not event:
+        return Response({"error": "Event not found"}, status=404)
+
+    data = request.data
+    name = (data.get("name") or "").strip()
+    venue = (data.get("venue") or "").strip()
+    description = (data.get("description") or "").strip()
+    event_date = (data.get("event_date") or "").strip()
+    start_time = (data.get("start_time") or "").strip()
+    end_time = (data.get("end_time") or "").strip()
+    lat_val = data.get("latitude")
+    lng_val = data.get("longitude")
+    radius_val = data.get("radius")
+
+    if not name or not event_date or not start_time or not end_time:
+        return Response({"error": "name, event_date, start_time, end_time are required"}, status=400)
+
+    # Automatically resolve coordinates from venue name if custom ones are not provided or changed
+    if not lat_val or not lng_val:
+        lat, lng = _geocode_address(venue or "ITM University Gwalior")
+    else:
+        try:
+            lat = float(lat_val)
+            lng = float(lng_val)
+        except (TypeError, ValueError):
+            lat, lng = 26.0607, 78.1396
+
+    try:
+        radius = int(radius_val) if radius_val else 300
+    except (TypeError, ValueError):
+        radius = 300
+
+    event.name = name
+    event.venue = venue or None
+    event.description = description or None
+    event.event_date = event_date
+    event.start_time = start_time
+    event.end_time = end_time
+    event.latitude = lat
+    event.longitude = lng
+    event.radius = radius
+    event.save()
+
+    services.log_action(request.user, "event.updated", target=f"Event #{event.id}: {name}")
+    return Response(_event_payload(event))
+
+
+
 
 @api_view(["POST"])
 @permission_classes([IsEventOrganizerOrAdmin])

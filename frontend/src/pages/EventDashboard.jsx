@@ -14,7 +14,9 @@ export default function EventDashboard() {
 
   const [formError, setFormError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [tab, setTab] = useState("events");
+
 
   function loadEvents() {
     api.get("/events").then(d => { setEvents(d.events || []); setLoading(false); }).catch(() => setLoading(false));
@@ -33,14 +35,49 @@ export default function EventDashboard() {
   async function createEvent(e) {
     e.preventDefault(); setFormError(""); setCreating(true);
     try {
-      await api.post("/events", form);
+      if (editingId) {
+        await api.put("/events/" + editingId + "/update", form);
+      } else {
+        await api.post("/events", form);
+      }
       setForm({ name: "", venue: "ITM University, Gwalior", description: "", event_date: "", start_time: "", end_time: "", radius: 300, latitude: "", longitude: "" });
       setShowCreate(false);
-
+      setEditingId(null);
       loadEvents();
-    } catch (err) { setFormError(err.message || "Failed to create event"); }
+    } catch (err) { setFormError(err.message || "Failed to save event"); }
     finally { setCreating(false); }
   }
+
+  function startEdit(ev) {
+    setForm({
+      name: ev.name,
+      venue: ev.venue || "",
+      description: ev.description || "",
+      event_date: ev.event_date,
+      start_time: ev.start_time,
+      end_time: ev.end_time,
+      radius: ev.radius || 300,
+      latitude: ev.latitude || "",
+      longitude: ev.longitude || ""
+    });
+    setEditingId(ev.id);
+    setShowCreate(true);
+    setFormError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleNewEventClick() {
+    if (showCreate) {
+      setShowCreate(false);
+      setEditingId(null);
+    } else {
+      setForm({ name: "", venue: "ITM University, Gwalior", description: "", event_date: "", start_time: "", end_time: "", radius: 300, latitude: "", longitude: "" });
+      setEditingId(null);
+      setFormError("");
+      setShowCreate(true);
+    }
+  }
+
 
   async function toggleEvent(eventId) {
     setToggling(true);
@@ -102,15 +139,17 @@ export default function EventDashboard() {
             </button>
           ))}
           <div style={{flex:1}}/>
-          <button className="btn2 btn2-primary" onClick={() => setShowCreate(!showCreate)}>
+          <button className="btn2 btn2-primary" onClick={handleNewEventClick}>
             {showCreate ? "Cancel" : "+ New Event"}
           </button>
         </div>
 
+
         {showCreate && (
           <div className="card2 mb-4" style={{maxWidth:600}}>
-            <span className="eyebrow">Create Event</span>
-            <h2 className="panel-title" style={{marginBottom:"1rem"}}>New Event / Function</h2>
+            <span className="eyebrow">{editingId ? "Edit Event" : "Create Event"}</span>
+            <h2 className="panel-title" style={{marginBottom:"1rem"}}>{editingId ? "Edit Event details" : "New Event / Function"}</h2>
+
             <form onSubmit={createEvent}>
               <label className="label2">Event Name *</label>
               <input className="input2 mb-2" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="IKS Cultural Program 2025" required/>
@@ -162,7 +201,8 @@ export default function EventDashboard() {
                 </div>
               </div>
               {formError && <div style={{color:"#DC2626",fontSize:"0.85rem",marginBottom:"0.75rem"}}>{formError}</div>}
-              <button className="btn2 btn2-primary w-100" type="submit" disabled={creating}>{creating ? "Creating..." : "Create Event"}</button>
+              <button className="btn2 btn2-primary w-100" type="submit" disabled={creating}>{creating ? "Saving..." : editingId ? "Save Changes" : "Create Event"}</button>
+
             </form>
           </div>
         )}
@@ -195,6 +235,7 @@ export default function EventDashboard() {
                     <div className="d-flex gap-2 flex-wrap">
                       <button className="btn2 btn2-outline btn-sm" style={{fontSize:"0.8rem"}} onClick={() => loadAttendees(ev.id)}>View Attendees</button>
                       <button className="btn2 btn2-outline btn-sm" style={{fontSize:"0.8rem"}} onClick={() => copyCheckinLink(ev.id)}>Copy Link</button>
+                      <button className="btn2 btn2-outline btn-sm" style={{fontSize:"0.8rem"}} onClick={() => startEdit(ev)}>✏️ Edit</button>
                       <button className={"btn2 btn-sm " + (ev.is_active?"btn2-outline":"btn2-primary")} style={{fontSize:"0.8rem"}} onClick={() => toggleEvent(ev.id)} disabled={toggling}>
                         {ev.is_active ? "Close" : "Open"}
                       </button>
@@ -202,6 +243,7 @@ export default function EventDashboard() {
                         🗑️ Delete
                       </button>
                     </div>
+
 
                   </div>
                 </div>
