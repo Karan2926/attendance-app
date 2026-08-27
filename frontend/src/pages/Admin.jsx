@@ -129,7 +129,7 @@ export default function Admin() {
     try {
       await api.post("/teachers", newTeacher);
       setNewTeacher({ full_name: "", username: "", password: "", role: "mentor" });
-      toast.success(newTeacher.role === "mentor" ? "Section Mentor account created" : "Teacher account created");
+      toast.success(newTeacher.role === "mentor" ? "Section Mentor account created" : newTeacher.role === "event_organizer" ? "Event Organizer account created" : "Teacher account created");
       loadOverview();
       loadStats();
     } catch (err) {
@@ -569,6 +569,7 @@ export default function Admin() {
                 >
                   <option value="mentor">🧑‍🏫 Section Mentor (Roster &amp; CSV Approvals)</option>
                   <option value="teacher">👨‍🏫 Subject Teacher (Mark Attendance)</option>
+                  <option value="event_organizer">📅 Event Organizer (Event Attendance)</option>
                 </select>
                 <label className="label2">Full name</label>
                 <input
@@ -593,7 +594,7 @@ export default function Admin() {
                   required
                 />
                 <button className="btn2 btn2-teal w-100" type="submit">
-                  Create {newTeacher.role === "mentor" ? "Section Mentor" : "Teacher"} Account
+                  Create {newTeacher.role === "mentor" ? "Section Mentor" : newTeacher.role === "event_organizer" ? "Event Organizer" : "Teacher"} Account
                 </button>
               </form>
               <div className="mt-3 mono" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>

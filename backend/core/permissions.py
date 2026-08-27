@@ -21,3 +21,12 @@ class IsStudent(BasePermission):
     def has_permission(self, request, view):
         u = request.user
         return bool(u and u.is_authenticated and getattr(u, "role", None) == "student")
+
+
+class IsEventOrganizerOrAdmin(BasePermission):
+    def has_permission(self, request, view):
+        u = request.user
+        if not (u and u.is_authenticated):
+            return False
+        return getattr(u, "role", None) in ("event_organizer", "admin")
+

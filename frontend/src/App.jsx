@@ -16,6 +16,8 @@ import Copilot from "./pages/Copilot";
 import Admin from "./pages/Admin";
 import RegisterExport from "./pages/RegisterExport";
 import MentorApprovals from "./pages/MentorApprovals";
+import EventCheckin from "./pages/EventCheckin";
+import EventDashboard from "./pages/EventDashboard";
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -61,6 +63,7 @@ function HomeGate() {
   if (user) {
     if (user.role === "mentor") return <Navigate to="/mentor_approvals" replace />;
     if (user.role === "student") return <Navigate to="/my_attendance" replace />;
+    if (user.role === "event_organizer") return <Navigate to="/event_dashboard" replace />;
     return (
       <Layout>
         <Dashboard />
@@ -91,6 +94,9 @@ export default function App() {
           </GuestOnly>
         }
       />
+
+      {/* Public event check-in — no login required */}
+      <Route path="/event/:eventId" element={<EventCheckin />} />
 
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
@@ -179,6 +185,14 @@ export default function App() {
             element={
               <RequireRole roles={["admin"]}>
                 <Admin />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/event_dashboard"
+            element={
+              <RequireRole roles={["event_organizer", "admin"]}>
+                <EventDashboard />
               </RequireRole>
             }
           />

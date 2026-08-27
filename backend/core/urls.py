@@ -78,4 +78,12 @@ urlpatterns = [
     path("portal/v1/attendance", portal_views.portal_attendance),
     path("portal/v1/attendance/export", portal_views.portal_attendance_export),
     path("portal/v1/attendance/push", portal_views.portal_attendance_push),
+    # ── Event Attendance Module ──────────────────────────────────────────────
+    path("events", views.event_list_create_view),
+    path("events/active", views.event_active_view),
+    path("events/<int:event_id>", views.event_detail_view),
+    path("events/<int:event_id>/toggle", views.event_toggle_view),
+    path("events/<int:event_id>/checkin", views.event_checkin_view),
+    path("events/<int:event_id>/attendance", views.event_attendance_list_view),
+    path("events/<int:event_id>/attendance.csv", views.event_attendance_csv_view),
 ]

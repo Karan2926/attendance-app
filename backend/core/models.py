@@ -74,6 +74,7 @@ class RoleUser(AbstractUser):
         ("admin", "admin"),
         ("teacher", "teacher"),
         ("mentor", "mentor"),
+        ("event_organizer", "event_organizer"),
         ("student", "student"),
     ]
     password = models.CharField(max_length=300)
@@ -296,3 +297,54 @@ class PendingRegistration(models.Model):
 
     def __str__(self):
         return f"PendingReg #{self.id} — {self.name} ({self.roll}) [{self.status}]"
+class EventSession(models.Model):
+    """A college function/event that requires face-recognition attendance."""
+    STATUS_UPCOMING = "upcoming"
+    STATUS_ACTIVE = "active"
+    STATUS_CLOSED = "closed"
+
+    name = models.CharField(max_length=255)
+    venue = models.CharField(max_length=255, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    event_date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_active = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        "RoleUser",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="events_created",
+    )
+    created_at = models.TextField(null=True, blank=True, default=now_iso)
+
+    class Meta:
+        db_table = "event_sessions"
+
+    def __str__(self):
+        return f"{self.name} ({self.event_date})"
+
+
+class EventAttendance(models.Model):
+    """Records a single student's self check-in to an event."""
+    event = models.ForeignKey(
+        "EventSession",
+        on_delete=models.CASCADE,
+        related_name="attendances",
+    )
+    student = models.ForeignKey(
+        "Student",
+        on_delete=models.CASCADE,
+        related_name="event_attendances",
+    )
+    checked_in_at = models.TextField(default=now_iso)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    location_accuracy = models.FloatField(null=True, blank=True)
+    photo_path = models.TextField(null=True, blank=True)
+    face_confidence = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        db_table = "event_attendance"
+        unique_together = ("event", "student")

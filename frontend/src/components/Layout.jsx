@@ -60,11 +60,20 @@ export default function Layout({ children }) {
               <NavLink to="/" className={navLinkClass} end>
                 Dashboard
               </NavLink>
+              <NavLink to="/event_dashboard" className={navLinkClass}>
+                Event Attendance
+              </NavLink>
               <NavLink to="/admin" className={navLinkClass}>
                 System Management
               </NavLink>
               <NavLink to="/admin?tab=audit" className={navLinkClass}>
                 Audit Log
+              </NavLink>
+            </>
+          ) : role === "event_organizer" ? (
+            <>
+              <NavLink to="/event_dashboard" className={navLinkClass}>
+                Event Dashboard
               </NavLink>
             </>
           ) : (

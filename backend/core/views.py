@@ -2187,3 +2187,321 @@ def register_export_xlsx_view(request):
     resp = HttpResponse(data, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     resp["Content-Disposition"] = f'attachment; filename="{fname}"'
     return resp
+
+
+# ===========================================================================
+# EVENT ATTENDANCE MODULE
+# ===========================================================================
+from .models import EventSession, EventAttendance
+from .permissions import IsEventOrganizerOrAdmin
+
+
+def _event_payload(event):
+    """Serialise an EventSession instance."""
+    count = EventAttendance.objects.filter(event=event).count()
+    return {
+        "id": event.id,
+        "name": event.name,
+        "venue": event.venue or "",
+        "description": event.description or "",
+        "event_date": str(event.event_date),
+        "start_time": str(event.start_time)[:5],
+        "end_time": str(event.end_time)[:5],
+        "is_active": event.is_active,
+        "created_at": event.created_at,
+        "attendance_count": count,
+    }
+
+
+@api_view(["GET", "POST"])
+def event_list_create_view(request):
+    """
+    GET  — public: list all events.
+    POST — event_organizer / admin: create a new event.
+    """
+    if request.method == "GET":
+        events = EventSession.objects.order_by("-event_date", "-id")
+        return Response({"events": [_event_payload(e) for e in events]})
+
+    # POST — protected
+    if not request.user.is_authenticated or getattr(request.user, "role", None) not in ("event_organizer", "admin"):
+        return Response({"error": "Not authorized"}, status=403)
+
+    data = request.data
+    name = (data.get("name") or "").strip()
+    venue = (data.get("venue") or "").strip()
+    description = (data.get("description") or "").strip()
+    event_date = (data.get("event_date") or "").strip()
+    start_time = (data.get("start_time") or "").strip()
+    end_time = (data.get("end_time") or "").strip()
+
+    if not name or not event_date or not start_time or not end_time:
+        return Response({"error": "name, event_date, start_time, end_time are required"}, status=400)
+
+    # Deactivate any existing active event before creating a new one
+    EventSession.objects.filter(is_active=True).update(is_active=False)
+
+    event = EventSession.objects.create(
+        name=name,
+        venue=venue or None,
+        description=description or None,
+        event_date=event_date,
+        start_time=start_time,
+        end_time=end_time,
+        is_active=True,
+        created_by=request.user,
+        created_at=now_iso(),
+    )
+    services.log_action(request.user, "event.created", target=f"Event #{event.id}: {name}")
+    return Response(_event_payload(event), status=201)
+
+
+@api_view(["GET"])
+def event_active_view(request):
+    """Public: return the currently active event (or null)."""
+    event = EventSession.objects.filter(is_active=True).order_by("-id").first()
+    if not event:
+        return Response({"event": None})
+    return Response({"event": _event_payload(event)})
+
+
+@api_view(["GET"])
+def event_detail_view(request, event_id):
+    """Public: get event details by ID."""
+    event = EventSession.objects.filter(id=event_id).first()
+    if not event:
+        return Response({"error": "Event not found"}, status=404)
+    return Response({"event": _event_payload(event)})
+
+
+@api_view(["POST"])
+@permission_classes([IsEventOrganizerOrAdmin])
+def event_toggle_view(request, event_id):
+    """Toggle active/inactive for an event."""
+    event = EventSession.objects.filter(id=event_id).first()
+    if not event:
+        return Response({"error": "Event not found"}, status=404)
+
+    if not event.is_active:
+        # Activating — close all others first
+        EventSession.objects.filter(is_active=True).update(is_active=False)
+        event.is_active = True
+        event.save()
+        services.log_action(request.user, "event.opened", target=f"Event #{event.id}")
+    else:
+        event.is_active = False
+        event.save()
+        services.log_action(request.user, "event.closed", target=f"Event #{event.id}")
+
+    return Response(_event_payload(event))
+
+
+@api_view(["GET"])
+@permission_classes([IsEventOrganizerOrAdmin])
+def event_attendance_list_view(request, event_id):
+    """Organizer: list all attendees for an event."""
+    event = EventSession.objects.filter(id=event_id).first()
+    if not event:
+        return Response({"error": "Event not found"}, status=404)
+
+    records = (
+        EventAttendance.objects.filter(event=event)
+        .select_related("student", "student__school_class")
+        .order_by("checked_in_at")
+    )
+    rows = []
+    for r in records:
+        st = r.student
+        rows.append({
+            "id": r.id,
+            "student_id": st.id,
+            "name": st.name,
+            "roll": st.roll or "",
+            "reg_no": st.reg_no or "",
+            "class_name": st.class_text or (st.school_class.name if st.school_class else ""),
+            "section": st.section or (st.school_class.section if st.school_class else ""),
+            "checked_in_at": r.checked_in_at,
+            "latitude": r.latitude,
+            "longitude": r.longitude,
+            "location_accuracy": r.location_accuracy,
+            "face_confidence": round(r.face_confidence * 100, 1) if r.face_confidence else None,
+        })
+    return Response({"event": _event_payload(event), "attendees": rows})
+
+
+@api_view(["GET"])
+@permission_classes([IsEventOrganizerOrAdmin])
+def event_attendance_csv_view(request, event_id):
+    """Organizer: download attendance as CSV."""
+    import csv as _csv
+    from io import StringIO
+
+    event = EventSession.objects.filter(id=event_id).first()
+    if not event:
+        return Response({"error": "Event not found"}, status=404)
+
+    records = (
+        EventAttendance.objects.filter(event=event)
+        .select_related("student", "student__school_class")
+        .order_by("checked_in_at")
+    )
+
+    buf = StringIO()
+    writer = _csv.writer(buf)
+    writer.writerow(["S.No.", "Name", "Roll No.", "Reg No.", "Class", "Section",
+                     "Check-In Time", "Latitude", "Longitude", "Accuracy (m)", "Face Confidence (%)"])
+    for i, r in enumerate(records, 1):
+        st = r.student
+        writer.writerow([
+            i,
+            st.name,
+            st.roll or "",
+            st.reg_no or "",
+            st.class_text or (st.school_class.name if st.school_class else ""),
+            st.section or (st.school_class.section if st.school_class else ""),
+            r.checked_in_at,
+            r.latitude or "",
+            r.longitude or "",
+            round(r.location_accuracy, 1) if r.location_accuracy else "",
+            round(r.face_confidence * 100, 1) if r.face_confidence else "",
+        ])
+
+    from django.http import HttpResponse as _HttpResponse
+    resp = _HttpResponse(buf.getvalue(), content_type="text/csv")
+    fname = f"event_attendance_{event.name.replace(' ', '_')}_{event.event_date}.csv"
+    resp["Content-Disposition"] = f'attachment; filename="{fname}"'
+    return resp
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@rate_limit(lambda r: f"event_checkin_{r.META.get('REMOTE_ADDR')}", 20, 60)
+def event_checkin_view(request, event_id):
+    """
+    Public self-check-in for an event.
+    Accepts: face image (images[] or image), latitude, longitude, accuracy.
+    Runs face recognition → records attendance with GPS.
+    """
+    import datetime
+
+    event = EventSession.objects.filter(id=event_id).first()
+    if not event:
+        return Response({"error": "Event not found."}, status=404)
+
+    if not event.is_active:
+        return Response({"error": "This event is not currently accepting check-ins."}, status=400)
+
+    # ── Time window check ──────────────────────────────────────────────────
+    now_dt = datetime.datetime.now()
+    event_start = datetime.datetime.combine(event.event_date, event.start_time)
+    event_end = datetime.datetime.combine(event.event_date, event.end_time)
+    if now_dt < event_start:
+        return Response({
+            "error": f"Check-in opens at {event.start_time.strftime('%I:%M %p')}. Please come back later."
+        }, status=400)
+    if now_dt > event_end:
+        return Response({
+            "error": f"Check-in for this event closed at {event.end_time.strftime('%I:%M %p')}."
+        }, status=400)
+
+    # ── Face image ─────────────────────────────────────────────────────────
+    img_stream, err = _clean_upload(request)
+    if err:
+        return err
+
+    # ── GPS ────────────────────────────────────────────────────────────────
+    try:
+        lat = float(request.data.get("latitude")) if request.data.get("latitude") else None
+        lng = float(request.data.get("longitude")) if request.data.get("longitude") else None
+        acc = float(request.data.get("accuracy")) if request.data.get("accuracy") else None
+    except (TypeError, ValueError):
+        lat = lng = acc = None
+
+    # ── Face recognition ───────────────────────────────────────────────────
+    try:
+        from .recognition import (
+            extract_face_for_image,
+            load_model_if_exists,
+            predict_with_model,
+        )
+
+        face = extract_face_for_image(img_stream)
+        if face is None:
+            return Response({"error": "No face detected. Please look directly at the camera in good lighting."}, status=400)
+
+        emb = face["embedding"]
+        clf = load_model_if_exists()
+        if clf is None:
+            return Response({"error": "Face recognition model is not trained yet. Contact the administrator."}, status=503)
+
+        pred_label, conf = predict_with_model(
+            clf,
+            emb,
+            allowed_ids=None,  # Check against ALL registered students (event-wide)
+            similarity_threshold=_effective_setting("recognition.live_threshold", LIVE_SIM_THRESHOLD),
+        )
+
+        if pred_label is None:
+            return Response({
+                "error": "Face not recognized. Make sure you are registered and approved in the system."
+            }, status=400)
+
+    except Exception as exc:
+        return Response({"error": f"Recognition failed: {str(exc)}"}, status=500)
+
+    student = Student.objects.filter(id=int(pred_label)).first()
+    if not student:
+        return Response({"error": "Student record not found."}, status=404)
+
+    # ── Duplicate check ────────────────────────────────────────────────────
+    if EventAttendance.objects.filter(event=event, student=student).exists():
+        return Response({
+            "error": f"You have already checked in to this event.",
+            "already_checked_in": True,
+            "student_name": student.name,
+            "student_roll": student.roll or "",
+        }, status=409)
+
+    # ── Save photo ─────────────────────────────────────────────────────────
+    import uuid
+    photo_path = None
+    try:
+        event_photos_dir = os.path.join(DATASET_DIR, "event_photos", str(event_id))
+        os.makedirs(event_photos_dir, exist_ok=True)
+        photo_filename = f"{student.id}_{uuid.uuid4().hex[:8]}.jpg"
+        photo_path = os.path.join(event_photos_dir, photo_filename)
+        img_stream.seek(0)
+        with open(photo_path, "wb") as f:
+            f.write(img_stream.read())
+    except Exception:
+        photo_path = None
+
+    # ── Record attendance ──────────────────────────────────────────────────
+    checked_in_at = now_iso()
+    EventAttendance.objects.create(
+        event=event,
+        student=student,
+        checked_in_at=checked_in_at,
+        latitude=lat,
+        longitude=lng,
+        location_accuracy=acc,
+        photo_path=photo_path,
+        face_confidence=conf,
+    )
+
+    services.log_action(None, "event.checkin", target=f"Student #{student.id} → Event #{event.id}")
+
+    return Response({
+        "success": True,
+        "student_name": student.name,
+        "student_roll": student.roll or "",
+        "student_reg_no": student.reg_no or "",
+        "class_name": student.class_text or (student.school_class.name if student.school_class else ""),
+        "section": student.section or (student.school_class.section if student.school_class else ""),
+        "checked_in_at": checked_in_at,
+        "latitude": lat,
+        "longitude": lng,
+        "event_name": event.name,
+        "face_confidence": round(conf * 100, 1),
+    })
+
