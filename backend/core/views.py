@@ -827,7 +827,7 @@ def create_teacher_view(request):
     password = request.data.get("password") or ""
     full_name = (request.data.get("full_name") or "").strip() or None
     role = (request.data.get("role") or "teacher").strip().lower()
-    if role not in ("teacher", "mentor"):
+    if role not in ("teacher", "mentor", "event_organizer"):
         role = "teacher"
     if not username or not password:
         return Response({"error": "username and password required"}, status=400)
@@ -942,7 +942,7 @@ def admin_overview_view(request):
     )
     teachers = list(
         get_user_model()
-        .objects.filter(role__in=["teacher", "mentor"])
+        .objects.filter(role__in=["teacher", "mentor", "event_organizer"])
         .order_by("username")
         .values("id", "username", "full_name", "role", "created_at")
     )
