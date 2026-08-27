@@ -2274,6 +2274,20 @@ def event_detail_view(request, event_id):
     return Response({"event": _event_payload(event)})
 
 
+@api_view(["DELETE"])
+@permission_classes([IsEventOrganizerOrAdmin])
+def event_delete_view(request, event_id):
+    """Delete an event session."""
+    event = EventSession.objects.filter(id=event_id).first()
+    if not event:
+        return Response({"error": "Event not found"}, status=404)
+    name = event.name
+    event.delete()
+    services.log_action(request.user, "event.deleted", target=f"Event #{event_id}: {name}")
+    return Response({"success": True})
+
+
+
 @api_view(["POST"])
 @permission_classes([IsEventOrganizerOrAdmin])
 def event_toggle_view(request, event_id):
@@ -2392,7 +2406,10 @@ def event_checkin_view(request, event_id):
         return Response({"error": "This event is not currently accepting check-ins."}, status=400)
 
     # ── Time window check ──────────────────────────────────────────────────
-    now_dt = datetime.datetime.now()
+    from django.utils import timezone
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Asia/Kolkata")
+    now_dt = timezone.now().astimezone(tz).replace(tzinfo=None)
     event_start = datetime.datetime.combine(event.event_date, event.start_time)
     event_end = datetime.datetime.combine(event.event_date, event.end_time)
     if now_dt < event_start:
@@ -2403,6 +2420,7 @@ def event_checkin_view(request, event_id):
         return Response({
             "error": f"Check-in for this event closed at {event.end_time.strftime('%I:%M %p')}."
         }, status=400)
+
 
     # ── Face image ─────────────────────────────────────────────────────────
     img_stream, err = _clean_upload(request)

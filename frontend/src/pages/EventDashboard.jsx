@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth";
-import Layout from "../components/Layout";
 
 export default function EventDashboard() {
   const { user } = useAuth();
@@ -60,8 +59,24 @@ export default function EventDashboard() {
     navigator.clipboard.writeText(url).then(() => alert("Check-in link copied! Share this with students: " + url));
   }
 
+  async function deleteEvent(eventId, name) {
+    if (!window.confirm(`Are you sure you want to permanently delete event "${name}"? All checked-in data for this event will be permanently deleted.`)) return;
+    try {
+      await api.delete("/events/" + eventId + "/delete");
+      loadEvents();
+      if (selected && selected.id === eventId) {
+        setSelected(null);
+        setAttendees([]);
+        setTab("events");
+      }
+    } catch (err) {
+      alert(err.message || "Failed to delete event");
+    }
+  }
+
+
   return (
-    <Layout>
+    <>
       <div className="page">
         <div className="dash-hero">
           <div className="dash-hero-main">
@@ -148,11 +163,15 @@ export default function EventDashboard() {
                     <div className="mono" style={{fontSize:"0.78rem",color:"var(--ink-soft)",marginBottom:"1rem"}}>{ev.event_date} | {ev.start_time} - {ev.end_time}</div>
                     <div className="d-flex gap-2 flex-wrap">
                       <button className="btn2 btn2-outline btn-sm" style={{fontSize:"0.8rem"}} onClick={() => loadAttendees(ev.id)}>View Attendees</button>
-                      <button className="btn2 btn2-outline btn-sm" style={{fontSize:"0.8rem"}} onClick={() => copyCheckinLink(ev.id)}>Copy Check-In Link</button>
+                      <button className="btn2 btn2-outline btn-sm" style={{fontSize:"0.8rem"}} onClick={() => copyCheckinLink(ev.id)}>Copy Link</button>
                       <button className={"btn2 btn-sm " + (ev.is_active?"btn2-outline":"btn2-primary")} style={{fontSize:"0.8rem"}} onClick={() => toggleEvent(ev.id)} disabled={toggling}>
-                        {ev.is_active ? "Close Event" : "Open Event"}
+                        {ev.is_active ? "Close" : "Open"}
+                      </button>
+                      <button className="btn2 btn2-outline btn-sm" style={{fontSize:"0.8rem", color:"#EF4444", borderColor:"#FECACA"}} onClick={() => deleteEvent(ev.id, ev.name)}>
+                        🗑️ Delete
                       </button>
                     </div>
+
                   </div>
                 </div>
               ))}
@@ -217,6 +236,6 @@ export default function EventDashboard() {
           </div>
         )}
       </div>
-    </Layout>
+    </>
   );
 }
