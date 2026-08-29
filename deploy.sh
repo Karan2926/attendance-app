@@ -25,13 +25,26 @@ echo "✓ Code updated"
 # 2. Backend dependencies
 echo "[2/5] Installing backend dependencies..."
 cd "$APP_DIR/backend"
-pip install -q -r requirements.txt 2>/dev/null || true
+PYTHON_BIN="python3"
+if [ -x "$APP_DIR/backend/.venv/bin/python" ]; then
+    PYTHON_BIN="$APP_DIR/backend/.venv/bin/python"
+elif command -v python3 &>/dev/null; then
+    PYTHON_BIN="python3"
+elif command -v python &>/dev/null; then
+    PYTHON_BIN="python"
+fi
+
+if [ -x "$APP_DIR/backend/.venv/bin/pip" ]; then
+    "$APP_DIR/backend/.venv/bin/pip" install -q -r requirements.txt 2>/dev/null || true
+else
+    pip3 install -q -r requirements.txt 2>/dev/null || pip install -q -r requirements.txt 2>/dev/null || true
+fi
 echo "✓ Backend dependencies OK"
 
 # 3. Run Django migrations
 echo "[3/5] Running database migrations..."
 cd "$APP_DIR/backend"
-python manage.py migrate --no-input
+"$PYTHON_BIN" manage.py migrate --no-input
 echo "✓ Migrations done"
 
 # 4. Build React frontend
