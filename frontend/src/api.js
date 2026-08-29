@@ -35,7 +35,20 @@ async function request(path, options = {}) {
     }
   }
   if (!res.ok) {
-    const err = new Error((data && (data.error || data.detail)) || `Request failed (${res.status})`);
+    let msg = `Request failed (${res.status})`;
+    if (typeof data === "string" && data.trim()) {
+      msg = data;
+    } else if (data && typeof data === "object") {
+      if (data.error) msg = data.error;
+      else if (data.detail) msg = data.detail;
+      else if (data.message) msg = data.message;
+      else {
+        const firstVal = Object.values(data)[0];
+        if (Array.isArray(firstVal)) msg = firstVal.join(" ");
+        else if (typeof firstVal === "string") msg = firstVal;
+      }
+    }
+    const err = new Error(msg);
     err.status = res.status;
     err.data = data;
     throw err;
