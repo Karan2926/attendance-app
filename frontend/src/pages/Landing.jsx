@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import usePageTitle from "../components/usePageTitle";
 import Brand from "../components/Brand";
+import ThreeDFaceCanvas from "../components/ThreeDFaceCanvas";
 import { api } from "../api";
 
 /* Scroll-triggered reveal / visibility hook. Falls back to visible when
@@ -273,6 +274,7 @@ const FEATURES = [
 export default function Landing() {
   usePageTitle("Digital Attendance");
   const [stats, setStats] = useState(null);
+  const [heroMode, setHeroMode] = useState("3d");
   const [statsRef, statsInView] = useInView();
 
   useEffect(() => {
@@ -330,7 +332,27 @@ export default function Landing() {
               <span>Runs on campus servers</span>
             </div>
           </div>
-          <CamPanel />
+          <div className="landing-hero-visual-col" style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", maxWidth: "540px" }}>
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setHeroMode("3d")}
+                className={`btn2 btn2-sm ${heroMode === "3d" ? "btn2-primary" : "btn2-outline"}`}
+                style={{ padding: "4px 12px", fontSize: "12px", borderRadius: "20px" }}
+              >
+                ✨ 3D Biometric Scan
+              </button>
+              <button
+                type="button"
+                onClick={() => setHeroMode("live")}
+                className={`btn2 btn2-sm ${heroMode === "live" ? "btn2-primary" : "btn2-outline"}`}
+                style={{ padding: "4px 12px", fontSize: "12px", borderRadius: "20px" }}
+              >
+                📷 Live Feed Demo
+              </button>
+            </div>
+            {heroMode === "3d" ? <ThreeDFaceCanvas /> : <CamPanel />}
+          </div>
         </div>
       </section>
 
