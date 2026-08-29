@@ -67,13 +67,13 @@ function useCountUp(target, start) {
 function StatCard({ icon, label, value, loaded, start, suffix = "" }) {
   const n = useCountUp(loaded ? value : 0, start);
   return (
-    <div className="landing-stat-card">
-      <div className="landing-stat-icon">{icon}</div>
+    <div className="landing-stat-card-light">
+      <div className="landing-stat-icon-light">{icon}</div>
       <div className="landing-stat-body">
-        <div className="landing-stat-num">
+        <div className="landing-stat-num-light">
           {loaded ? `${n.toLocaleString()}${suffix}` : "—"}
         </div>
-        <div className="landing-stat-label">{label}</div>
+        <div className="landing-stat-label-light">{label}</div>
       </div>
     </div>
   );
@@ -116,9 +116,9 @@ const TECH_STACK = [
     badge: "Server",
   },
   {
-    name: "Cloudflare & Security",
+    name: "Security & Permissions",
     category: "Edge Protection",
-    desc: "HttpOnly cookies, HSTS headers & rate-limiting protection.",
+    desc: "HttpOnly cookies, HSTS headers & role-based permissions.",
     icon: "🛡️",
     badge: "Security",
   },
@@ -185,7 +185,7 @@ const HOW_IT_WORKS_STEPS = [
 ];
 
 export default function Landing() {
-  usePageTitle("Digital Attendance · AI Face Recognition");
+  usePageTitle("Digital Attendance · ITM University");
   const [stats, setStats] = useState(null);
   const [statsRef, statsInView] = useInView();
 
@@ -196,83 +196,70 @@ export default function Landing() {
   const year = new Date().getFullYear();
 
   return (
-    <div className="landing-dark-root">
+    <div className="landing-light-root">
       {/* ---------- Top Navigation ---------- */}
-      <header className="dark-nav">
-        <div className="dark-nav-container">
+      <header className="light-nav">
+        <div className="light-nav-container">
           <Brand />
-          <nav className="dark-nav-links">
+          <nav className="light-nav-links">
             <a href="#how-it-works">How it works</a>
             <a href="#tech-stack">Tech Stack</a>
             <a href="#features">Features</a>
           </nav>
-          <div className="dark-nav-actions">
-            <a
-              href="https://github.com/Karan2926/attendance-app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-ghost-dark"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: "6px" }}>
-                <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-              </svg>
-              GitHub
-            </a>
-            <Link to="/login" className="btn-glow-primary">
-              See Live Demo →
+          <div className="light-nav-actions">
+            <Link to="/login" className="btn2 btn2-outline">
+              Sign in
+            </Link>
+            <Link to="/register" className="btn2 btn2-primary">
+              Sign Up
             </Link>
           </div>
         </div>
       </header>
 
       {/* ---------- Hero Section with 3D Face Scene ---------- */}
-      <section className="dark-hero">
-        <div className="dark-hero-grid-bg" aria-hidden="true" />
-        <div className="dark-hero-container">
-          <div className="dark-hero-copy">
-            <div className="pill-badge">
-              <span className="pill-dot" /> AI-Powered Biometric Platform
+      <section className="light-hero">
+        <div className="light-hero-grid-bg" aria-hidden="true" />
+        <div className="light-hero-container">
+          <div className="light-hero-copy">
+            <div className="pill-badge-light">
+              <span className="pill-dot-light" /> ITM University · Digital Attendance
             </div>
-            <h1 className="dark-hero-headline">
+            <h1 className="light-hero-headline">
               Attendance, <br />
-              <span className="text-gradient">recognized instantly.</span>
+              <span className="text-gradient-light">recognized instantly.</span>
             </h1>
-            <p className="dark-hero-sub">
-              Replacing manual roll calls and proxy check-ins with high-precision facial recognition AI. Built for modern university campuses and events.
+            <p className="light-hero-sub">
+              Replacing manual roll calls and proxy check-ins with high-precision AI face recognition. Built for modern university campuses and classroom management.
             </p>
 
-            <div className="dark-hero-actions">
-              <Link to="/login" className="btn-glow-primary btn-lg">
-                See Live Demo <span style={{ marginLeft: "8px" }}>→</span>
+            <div className="light-hero-actions">
+              <Link to="/register" className="btn2 btn2-primary btn-lg">
+                Sign Up <span style={{ marginLeft: "8px" }}>→</span>
               </Link>
-              <a
-                href="https://github.com/Karan2926/attendance-app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-ghost-dark btn-lg"
-              >
-                View on GitHub
-              </a>
+              <Link to="/login" className="btn2 btn2-outline btn-lg">
+                Sign In
+              </Link>
             </div>
 
-            <div className="dark-hero-badges">
+            <div className="light-hero-badges">
               <span>⚡ 1.2s Match Speed</span>
               <span>🔒 99.2% Accuracy</span>
-              <span>🛡️ Geofenced</span>
+              <span>🛡️ Geofenced Check-in</span>
             </div>
           </div>
 
           {/* 3D Scene Column */}
-          <div className="dark-hero-3d-col">
+          <div className="light-hero-3d-col">
             <ThreeDFaceCanvas compact={false} showChips={true} />
           </div>
         </div>
       </section>
 
       {/* ---------- Live Stats Counter Section ---------- */}
-      <section className="dark-stats-section" ref={statsRef}>
-        <div className="dark-container">
-          <div className="dark-stats-grid">
+      <section className="light-stats-section" ref={statsRef}>
+        <div className="light-container">
+          <div className="light-stats-grid">
             <StatCard
               icon="👥"
               label="Students Enrolled"
@@ -309,24 +296,24 @@ export default function Landing() {
       </section>
 
       {/* ---------- How It Works Section ---------- */}
-      <section id="how-it-works" className="dark-section">
-        <div className="dark-container">
-          <div className="dark-section-header text-center">
-            <div className="pill-badge">Process Overview</div>
-            <h2 className="dark-section-title">How It Works</h2>
-            <p className="dark-section-sub">
+      <section id="how-it-works" className="light-section">
+        <div className="light-container">
+          <div className="light-section-header text-center">
+            <div className="pill-badge-light">Process Overview</div>
+            <h2 className="light-section-title">How It Works</h2>
+            <p className="light-section-sub">
               From camera feed capture to automated PostgreSQL database entry in 4 seamless steps.
             </p>
           </div>
 
           <div className="how-it-works-grid">
-            {HOW_IT_WORKS_STEPS.map((step, idx) => (
+            {HOW_IT_WORKS_STEPS.map((step) => (
               <Reveal key={step.step} className="how-card-reveal">
-                <div className="how-card">
-                  <div className="how-step-num">{step.step}</div>
+                <div className="how-card-light">
+                  <div className="how-step-num-light">{step.step}</div>
                   <div className="how-icon">{step.icon}</div>
-                  <h3 className="how-title">{step.title}</h3>
-                  <p className="how-desc">{step.desc}</p>
+                  <h3 className="how-title-light">{step.title}</h3>
+                  <p className="how-desc-light">{step.desc}</p>
                 </div>
               </Reveal>
             ))}
@@ -335,24 +322,24 @@ export default function Landing() {
       </section>
 
       {/* ---------- Tech Stack Section (Interactive 3D Tilt Cards) ---------- */}
-      <section id="tech-stack" className="dark-section alt-bg">
-        <div className="dark-container">
-          <div className="dark-section-header text-center">
-            <div className="pill-badge">Architecture</div>
-            <h2 className="dark-section-title">Built On Enterprise Tech</h2>
-            <p className="dark-section-sub">
+      <section id="tech-stack" className="light-section alt-bg-light">
+        <div className="light-container">
+          <div className="light-section-header text-center">
+            <div className="pill-badge-light">Architecture</div>
+            <h2 className="light-section-title">Built On Enterprise Tech</h2>
+            <p className="light-section-sub">
               Move your cursor over cards to explore our production tech stack in 3D perspective.
             </p>
           </div>
 
           <div className="tech-stack-grid">
             {TECH_STACK.map((tech) => (
-              <TiltCard key={tech.name} className="tech-tilt-card">
-                <div className="tech-card-badge">{tech.badge}</div>
+              <TiltCard key={tech.name} className="tech-tilt-card-light">
+                <div className="tech-card-badge-light">{tech.badge}</div>
                 <div className="tech-card-icon">{tech.icon}</div>
-                <h3 className="tech-card-title">{tech.name}</h3>
-                <div className="tech-card-cat">{tech.category}</div>
-                <p className="tech-card-desc">{tech.desc}</p>
+                <h3 className="tech-card-title-light">{tech.name}</h3>
+                <div className="tech-card-cat-light">{tech.category}</div>
+                <p className="tech-card-desc-light">{tech.desc}</p>
               </TiltCard>
             ))}
           </div>
@@ -360,12 +347,12 @@ export default function Landing() {
       </section>
 
       {/* ---------- Features Grid Section ---------- */}
-      <section id="features" className="dark-section">
-        <div className="dark-container">
-          <div className="dark-section-header text-center">
-            <div className="pill-badge">Platform Capabilities</div>
-            <h2 className="dark-section-title">Everything You Need for Campus Attendance</h2>
-            <p className="dark-section-sub">
+      <section id="features" className="light-section">
+        <div className="light-container">
+          <div className="light-section-header text-center">
+            <div className="pill-badge-light">Platform Capabilities</div>
+            <h2 className="light-section-title">Everything You Need for Campus Attendance</h2>
+            <p className="light-section-sub">
               Engineered for high-volume classroom verification, privacy compliance, and instant export.
             </p>
           </div>
@@ -373,10 +360,10 @@ export default function Landing() {
           <div className="features-grid">
             {FEATURES.map((feat) => (
               <Reveal key={feat.title} className="feature-reveal-card">
-                <TiltCard className="feature-card">
+                <TiltCard className="feature-card-light">
                   <div className="feature-icon">{feat.icon}</div>
-                  <h3 className="feature-title">{feat.title}</h3>
-                  <p className="feature-text">{feat.text}</p>
+                  <h3 className="feature-title-light">{feat.title}</h3>
+                  <p className="feature-text-light">{feat.text}</p>
                 </TiltCard>
               </Reveal>
             ))}
@@ -385,29 +372,24 @@ export default function Landing() {
       </section>
 
       {/* ---------- Footer CTA Section ---------- */}
-      <section className="dark-cta-footer-section">
-        <div className="dark-cta-bg-3d">
+      <section className="light-cta-footer-section">
+        <div className="light-cta-bg-3d">
           <ThreeDFaceCanvas compact={true} showChips={false} />
         </div>
-        <div className="dark-container text-center relative-z">
-          <h2 className="dark-cta-headline">Ready to modernize your classroom attendance?</h2>
-          <p className="dark-cta-sub">
-            Experience real-time face recognition and geofenced event check-ins on our live platform.
+        <div className="light-container text-center relative-z">
+          <h2 className="light-cta-headline">Ready to modernize your classroom attendance?</h2>
+          <p className="light-cta-sub">
+            Experience real-time face recognition and geofenced event check-ins on our digital platform.
           </p>
-          <div className="dark-cta-actions">
-            <Link to="/login" className="btn-glow-primary btn-lg">
-              Launch Live Demo →
+          <div className="light-cta-actions">
+            <Link to="/register" className="btn2 btn2-primary btn-lg">
+              Sign Up Now →
             </Link>
-            <a
-              href="https://github.com/Karan2926/attendance-app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-ghost-dark btn-lg"
-            >
-              Star on GitHub ⭐
-            </a>
+            <Link to="/login" className="btn2 btn2-outline btn-lg">
+              Sign In
+            </Link>
           </div>
-          <div className="dark-footer-copyright">
+          <div className="light-footer-copyright">
             © {year} ITM University · Digital Attendance Management System. All rights reserved.
           </div>
         </div>

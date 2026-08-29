@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 
 /**
- * 3D Face Biometric Particle Mesh & Laser Sweep Scene.
+ * 3D Face Biometric Particle Mesh & Laser Sweep Scene (Light Theme Edition).
  * Features rotating low-poly head landmark geometry, glowing scanning plane,
  * mouse parallax, and orbiting translucent glassmorphism status chips.
  */
@@ -10,9 +10,9 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
   const [activeChipIndex, setActiveChipIndex] = useState(0);
 
   const chips = [
-    { text: "✨ Face Matched — 98.2%", icon: "✓", color: "#14B8A6" },
-    { text: "⚡ Attendance Marked", icon: "🕒 09:41 AM", color: "#3B82F6" },
-    { text: "👤 57 Students Recognized", icon: "CS-3A", color: "#06B6D4" },
+    { text: "✨ Face Matched — 98.2%", icon: "✓", color: "#059669" },
+    { text: "⚡ Attendance Marked", icon: "🕒 09:41 AM", color: "#1D4ED8" },
+    { text: "👤 57 Students Recognized", icon: "CS-3A", color: "#D97706" },
   ];
 
   // Cycle floating status chip index every 2.8s
@@ -133,8 +133,8 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
         projNodes.push({ px, py, scale, z: n.z });
       }
 
-      // Connecting 3D wireframe edges
-      ctx.lineWidth = 0.8;
+      // Connecting 3D wireframe edges (Navy / Emerald for Light Mode)
+      ctx.lineWidth = 1.0;
       for (let i = 0; i < projNodes.length; i++) {
         for (let j = i + 1; j < projNodes.length; j++) {
           const n1 = projNodes[i];
@@ -144,8 +144,8 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
           const dist = Math.sqrt(dx * dx + dy * dy);
 
           if (dist < 68) {
-            const alpha = (1 - dist / 68) * 0.32 * Math.max(0, (n1.z + radius) / (radius * 2));
-            ctx.strokeStyle = `rgba(20, 184, 166, ${alpha})`;
+            const alpha = (1 - dist / 68) * 0.4 * Math.max(0, (n1.z + radius) / (radius * 2));
+            ctx.strokeStyle = `rgba(30, 58, 138, ${alpha})`;
             ctx.beginPath();
             ctx.moveTo(n1.px, n1.py);
             ctx.lineTo(n2.px, n2.py);
@@ -157,10 +157,10 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
       // Nodes rendering
       for (let i = 0; i < projNodes.length; i++) {
         const n = projNodes[i];
-        const alpha = Math.max(0.15, (n.z + radius) / (radius * 2));
-        const rSize = Math.max(1, 2.2 * n.scale);
+        const alpha = Math.max(0.2, (n.z + radius) / (radius * 2));
+        const rSize = Math.max(1.2, 2.5 * n.scale);
 
-        ctx.fillStyle = `rgba(56, 189, 248, ${alpha})`;
+        ctx.fillStyle = `rgba(16, 185, 129, ${alpha})`;
         ctx.beginPath();
         ctx.arc(n.px, n.py, rSize, 0, Math.PI * 2);
         ctx.fill();
@@ -176,23 +176,23 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
           const py = cy + rot.y * scale;
 
           if (rot.z > -10) {
-            ctx.strokeStyle = "#14B8A6";
-            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = "#2563EB";
+            ctx.lineWidth = 1.4;
             ctx.beginPath();
             ctx.arc(px, py, 6, 0, Math.PI * 2);
             ctx.stroke();
 
-            ctx.fillStyle = "#38BDF8";
+            ctx.fillStyle = "#10B981";
             ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
 
-            ctx.font = "9px 'JetBrains Mono', monospace";
-            ctx.fillStyle = "rgba(20, 184, 166, 0.85)";
+            ctx.font = "600 10px 'JetBrains Mono', monospace";
+            ctx.fillStyle = "#1E3A8A";
             ctx.fillText(lm.label, px + 8, py + 3);
           }
         });
       }
 
-      // Laser Scanner Sweep Plane
+      // Laser Scanner Sweep Plane (Emerald / Blue Glow)
       scanY += 1.6 * scanDir;
       if (scanY > radius || scanY < -radius) scanDir *= -1;
 
@@ -200,15 +200,15 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
       const curScanY = cy + scanY * scanScale;
 
       const grad = ctx.createLinearGradient(0, curScanY - 14, 0, curScanY + 14);
-      grad.addColorStop(0, "rgba(20, 184, 166, 0)");
-      grad.addColorStop(0.5, "rgba(20, 184, 166, 0.55)");
-      grad.addColorStop(1, "rgba(20, 184, 166, 0)");
+      grad.addColorStop(0, "rgba(16, 185, 129, 0)");
+      grad.addColorStop(0.5, "rgba(16, 185, 129, 0.45)");
+      grad.addColorStop(1, "rgba(16, 185, 129, 0)");
 
       ctx.fillStyle = grad;
       ctx.fillRect(cx - radius * 1.2, curScanY - 10, radius * 2.4, 20);
 
-      ctx.strokeStyle = "#38BDF8";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#10B981";
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.moveTo(cx - radius * 1.15, curScanY);
       ctx.lineTo(cx + radius * 1.15, curScanY);
@@ -235,12 +235,12 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
           width: "100%",
           height: "100%",
           borderRadius: "20px",
-          background: "radial-gradient(ellipse at center, rgba(20, 184, 166, 0.08) 0%, rgba(9, 13, 22, 0.95) 75%)",
-          boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(20, 184, 166, 0.25)",
+          background: "radial-gradient(ellipse at center, rgba(238, 242, 255, 0.95) 0%, rgba(243, 246, 251, 0.98) 75%)",
+          boxShadow: "0 20px 40px rgba(15, 30, 53, 0.08), inset 0 0 0 1px rgba(30, 58, 138, 0.12)",
         }}
       />
 
-      {/* Floating Translucent Glassmorphism Status Cards */}
+      {/* Floating Translucent Glassmorphism Status Cards (Light Theme) */}
       {showChips && !compact && (
         <div
           className="floating-chips-container"
@@ -258,15 +258,16 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
             <div
               className="glass-chip"
               style={{
-                background: "rgba(15, 23, 42, 0.75)",
+                background: "rgba(255, 255, 255, 0.85)",
                 backdropFilter: "blur(12px)",
-                border: "1px solid rgba(20, 184, 166, 0.4)",
+                border: "1px solid rgba(16, 185, 129, 0.4)",
                 padding: "8px 14px",
                 borderRadius: "12px",
-                color: "#14B8A6",
+                color: "#047857",
+                fontWeight: "600",
                 fontSize: "12px",
                 fontFamily: "'JetBrains Mono', monospace",
-                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                boxShadow: "0 8px 24px rgba(15, 30, 53, 0.08)",
                 transition: "all 0.5s ease",
                 opacity: activeChipIndex === 0 ? 1 : 0.4,
                 transform: activeChipIndex === 0 ? "scale(1.05) translateY(0)" : "scale(0.95) translateY(4px)",
@@ -277,15 +278,16 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
             <div
               className="glass-chip"
               style={{
-                background: "rgba(15, 23, 42, 0.75)",
+                background: "rgba(255, 255, 255, 0.85)",
                 backdropFilter: "blur(12px)",
-                border: "1px solid rgba(59, 130, 246, 0.4)",
+                border: "1px solid rgba(37, 99, 235, 0.4)",
                 padding: "8px 14px",
                 borderRadius: "12px",
-                color: "#60A5FA",
+                color: "#1D4ED8",
+                fontWeight: "600",
                 fontSize: "12px",
                 fontFamily: "'JetBrains Mono', monospace",
-                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                boxShadow: "0 8px 24px rgba(15, 30, 53, 0.08)",
                 transition: "all 0.5s ease",
                 opacity: activeChipIndex === 1 ? 1 : 0.4,
                 transform: activeChipIndex === 1 ? "scale(1.05) translateY(0)" : "scale(0.95) translateY(4px)",
@@ -299,15 +301,16 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
             <div
               className="glass-chip"
               style={{
-                background: "rgba(15, 23, 42, 0.75)",
+                background: "rgba(255, 255, 255, 0.85)",
                 backdropFilter: "blur(12px)",
-                border: "1px solid rgba(6, 182, 212, 0.4)",
+                border: "1px solid rgba(217, 119, 6, 0.4)",
                 padding: "8px 16px",
                 borderRadius: "12px",
-                color: "#38BDF8",
+                color: "#B45309",
+                fontWeight: "600",
                 fontSize: "12px",
                 fontFamily: "'JetBrains Mono', monospace",
-                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                boxShadow: "0 8px 24px rgba(15, 30, 53, 0.08)",
                 transition: "all 0.5s ease",
                 opacity: activeChipIndex === 2 ? 1 : 0.4,
                 transform: activeChipIndex === 2 ? "scale(1.05) translateY(0)" : "scale(0.95) translateY(4px)",

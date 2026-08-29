@@ -2309,3 +2309,422 @@ h5 {
   }
 }
 
+/* ==========================================================================
+   Clean Academic Light System Landing Theme
+   ========================================================================== */
+.landing-light-root {
+  background-color: #f8fafc;
+  color: #0f1e35;
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow-x: hidden;
+  font-family: var(--font-display);
+}
+
+.light-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(216, 224, 238, 0.9);
+  padding: 1rem 1.5rem;
+}
+
+.light-nav-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.light-nav-links {
+  display: flex;
+  gap: 2rem;
+}
+
+.light-nav-links a {
+  color: #42536e;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.light-nav-links a:hover {
+  color: #1e3a8a;
+}
+
+.light-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.light-hero {
+  position: relative;
+  padding: 5rem 1.5rem 6rem;
+  min-height: 88vh;
+  display: flex;
+  align-items: center;
+}
+
+.light-hero-grid-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(30, 58, 138, 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+}
+
+.light-hero-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+.pill-badge-light {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(30, 58, 138, 0.08);
+  border: 1px solid rgba(30, 58, 138, 0.25);
+  color: #1e3a8a;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  margin-bottom: 1.2rem;
+  font-weight: 600;
+}
+
+.pill-dot-light {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1e3a8a;
+  box-shadow: 0 0 8px rgba(30, 58, 138, 0.6);
+  animation: pulse-dot 1.8s infinite;
+}
+
+.light-hero-headline {
+  font-size: 3.6rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+  color: #0f1e35;
+  margin-bottom: 1.4rem;
+}
+
+.text-gradient-light {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #059669 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.light-hero-sub {
+  font-size: 1.15rem;
+  color: #42536e;
+  line-height: 1.6;
+  max-width: 520px;
+  margin-bottom: 2rem;
+}
+
+.light-hero-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+}
+
+.light-hero-badges {
+  display: flex;
+  gap: 1.5rem;
+  color: #64748b;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.light-hero-3d-col {
+  width: 100%;
+  position: relative;
+}
+
+/* ---------- Light Stats Bar ---------- */
+.light-stats-section {
+  padding: 3rem 1.5rem;
+  border-top: 1px solid rgba(216, 224, 238, 0.9);
+  border-bottom: 1px solid rgba(216, 224, 238, 0.9);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.light-container {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.light-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+.landing-stat-card-light {
+  background: #ffffff;
+  border: 1px solid rgba(216, 224, 238, 0.9);
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 10px 25px rgba(15, 30, 53, 0.04);
+}
+
+.landing-stat-icon-light {
+  font-size: 1.8rem;
+  background: rgba(30, 58, 138, 0.08);
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(30, 58, 138, 0.15);
+}
+
+.landing-stat-num-light {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #0f1e35;
+  font-family: var(--font-mono);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.landing-stat-label-light {
+  color: #42536e;
+  font-size: 0.88rem;
+}
+
+/* ---------- Light Sections ---------- */
+.light-section {
+  padding: 6rem 1.5rem;
+  position: relative;
+}
+
+.light-section.alt-bg-light {
+  background: rgba(241, 245, 249, 0.6);
+  border-top: 1px solid rgba(216, 224, 238, 0.9);
+  border-bottom: 1px solid rgba(216, 224, 238, 0.9);
+}
+
+.light-section-header {
+  margin-bottom: 4rem;
+}
+
+.light-section-title {
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: #0f1e35;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.light-section-sub {
+  color: #42536e;
+  font-size: 1.1rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ---------- How It Works Light Grid ---------- */
+.how-card-light {
+  background: #ffffff;
+  border: 1px solid rgba(216, 224, 238, 0.9);
+  border-radius: 18px;
+  padding: 2rem 1.5rem;
+  position: relative;
+  height: 100%;
+  box-shadow: 0 10px 30px rgba(15, 30, 53, 0.04);
+  transition: all 0.3s ease;
+}
+
+.how-card-light:hover {
+  border-color: #1e3a8a;
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px rgba(30, 58, 138, 0.12);
+}
+
+.how-step-num-light {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  background: rgba(30, 58, 138, 0.08);
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 8px;
+  margin-bottom: 1.2rem;
+}
+
+.how-title-light {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0f1e35;
+  margin-bottom: 0.6rem;
+}
+
+.how-desc-light {
+  font-size: 0.92rem;
+  color: #42536e;
+  line-height: 1.5;
+}
+
+/* ---------- Tech Stack Light Grid ---------- */
+.tech-tilt-card-light {
+  background: #ffffff;
+  border: 1px solid rgba(216, 224, 238, 0.9);
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 10px 30px rgba(15, 30, 53, 0.04);
+}
+
+.tech-card-badge-light {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: #1e3a8a;
+  background: rgba(30, 58, 138, 0.08);
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  margin-bottom: 1.2rem;
+  font-weight: 600;
+}
+
+.tech-card-title-light {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #0f1e35;
+  margin-bottom: 0.3rem;
+}
+
+.tech-card-cat-light {
+  font-size: 0.85rem;
+  color: #059669;
+  font-weight: 600;
+  margin-bottom: 0.8rem;
+}
+
+.tech-card-desc-light {
+  font-size: 0.92rem;
+  color: #42536e;
+  line-height: 1.5;
+}
+
+/* ---------- Features Light Grid ---------- */
+.feature-card-light {
+  background: #ffffff;
+  border: 1px solid rgba(216, 224, 238, 0.9);
+  border-radius: 20px;
+  padding: 2.2rem 1.8rem;
+  height: 100%;
+  box-shadow: 0 10px 30px rgba(15, 30, 53, 0.04);
+}
+
+.feature-title-light {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f1e35;
+  margin-bottom: 0.6rem;
+}
+
+.feature-text-light {
+  font-size: 0.95rem;
+  color: #42536e;
+  line-height: 1.55;
+}
+
+/* ---------- Footer Light CTA ---------- */
+.light-cta-footer-section {
+  position: relative;
+  padding: 7rem 1.5rem 3.5rem;
+  border-top: 1px solid rgba(216, 224, 238, 0.9);
+  overflow: hidden;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.light-cta-bg-3d {
+  position: absolute;
+  inset: 0;
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.light-cta-headline {
+  font-size: 3rem;
+  font-weight: 800;
+  color: #0f1e35;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.2rem;
+}
+
+.light-cta-sub {
+  font-size: 1.15rem;
+  color: #42536e;
+  max-width: 580px;
+  margin: 0 auto 2.5rem;
+}
+
+.light-cta-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1.2rem;
+  margin-bottom: 4rem;
+  flex-wrap: wrap;
+}
+
+.light-footer-copyright {
+  color: #64748b;
+  font-size: 0.88rem;
+  border-top: 1px solid rgba(216, 224, 238, 0.8);
+  padding-top: 2rem;
+}
+
+@media (max-width: 1024px) {
+  .light-hero-container {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .light-hero-sub {
+    margin: 0 auto 2rem;
+  }
+  .light-hero-actions {
+    justify-content: center;
+  }
+  .light-hero-badges {
+    justify-content: center;
+  }
+  .light-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .light-hero-headline {
+    font-size: 2.5rem;
+  }
+  .light-nav-links {
+    display: none;
+  }
+}
+
+
