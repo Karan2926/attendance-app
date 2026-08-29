@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 
 /**
- * 3D Face Biometric Particle Mesh & Laser Sweep Scene (Light Theme Edition).
- * Features rotating low-poly head landmark geometry, glowing scanning plane,
- * mouse parallax, and orbiting translucent glassmorphism status chips.
+ * Procedural 3D Low-Poly Human Head & Biometric Scanning Mesh.
+ * Models an abstract, low-poly triangulated human head topology with laser sweeps,
+ * emissive nodes, mouse rotation parallax, and floating status chips.
  */
 export default function ThreeDFaceCanvas({ compact = false, showChips = true }) {
   const canvasRef = useRef(null);
@@ -15,7 +15,6 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
     { text: "👤 57 Students Recognized", icon: "CS-3A", color: "#D97706" },
   ];
 
-  // Cycle floating status chip index every 2.8s
   useEffect(() => {
     if (!showChips) return;
     const interval = setInterval(() => {
@@ -41,41 +40,74 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
 
     window.addEventListener("resize", handleResize);
 
-    // 3D Nodes generation representing stylized face mesh
-    const numNodes = compact ? 50 : 90;
-    const nodes = [];
-    const radius = Math.min(width, height) * (compact ? 0.28 : 0.34);
+    // -----------------------------------------------------------------------
+    // Low-Poly Anatomical Human Head Mesh Geometry (3D Vertices)
+    // -----------------------------------------------------------------------
+    const rawHeadVertices = [
+      // Crown & Forehead
+      { x: 0, y: -130, z: 0 },
+      { x: -45, y: -115, z: 30 }, { x: 45, y: -115, z: 30 },
+      { x: -75, y: -90, z: 15 },  { x: 75, y: -90, z: 15 },
+      { x: -50, y: -80, z: 65 },  { x: 50, y: -80, z: 65 },
+      { x: 0, y: -85, z: 75 },
 
-    for (let i = 0; i < numNodes; i++) {
-      const phi = Math.acos(-1 + (2 * i) / numNodes);
-      const theta = Math.sqrt(numNodes * Math.PI) * phi;
-      nodes.push({
-        x: radius * Math.cos(theta) * Math.sin(phi),
-        y: radius * Math.sin(theta) * Math.sin(phi),
-        z: radius * Math.cos(phi),
-        pulse: Math.random() * Math.PI * 2,
-      });
-    }
+      // Eyebrow Ridge & Temples
+      { x: -65, y: -45, z: 70 }, { x: -25, y: -45, z: 85 },
+      { x: 0, y: -45, z: 90 },
+      { x: 25, y: -45, z: 85 },  { x: 65, y: -45, z: 70 },
+      { x: -85, y: -40, z: 20 }, { x: 85, y: -40, z: 20 },
 
-    // Facial landmark features (Eyes, Nose, Mouth, Jaw, Brow contours)
-    const landmarks = [
-      { x: -38, y: -28, z: 80, label: "Left Eye" },
-      { x: 38, y: -28, z: 80, label: "Right Eye" },
-      { x: 0, y: 5, z: 102, label: "Nose Tip" },
-      { x: 0, y: 42, z: 85, label: "Chin" },
-      { x: -30, y: 32, z: 78, label: "Mouth-L" },
-      { x: 30, y: 32, z: 78, label: "Mouth-R" },
-      { x: -58, y: -48, z: 55, label: "Brow-L" },
-      { x: 58, y: -48, z: 55, label: "Brow-R" },
+      // Eye Sockets & Nose Bridge
+      { x: -40, y: -25, z: 75 }, { x: -15, y: -25, z: 82 },
+      { x: 0, y: -20, z: 98 },   { x: 15, y: -25, z: 82 }, { x: 40, y: -25, z: 75 },
+
+      // Cheekbones & Nose Tip
+      { x: -75, y: -10, z: 50 }, { x: -45, y: -5, z: 70 },
+      { x: 0, y: 5, z: 112 },    // Nose Tip
+      { x: 45, y: -5, z: 70 },   { x: 75, y: -10, z: 50 },
+
+      // Nostrils & Upper Lip
+      { x: -20, y: 18, z: 88 },  { x: 0, y: 22, z: 95 },  { x: 20, y: 18, z: 88 },
+      { x: -40, y: 20, z: 65 },  { x: 40, y: 20, z: 65 },
+
+      // Mouth Line & Cheeks
+      { x: -35, y: 40, z: 75 },  { x: 0, y: 42, z: 88 },  { x: 35, y: 40, z: 75 },
+      { x: -70, y: 30, z: 35 },  { x: 70, y: 30, z: 35 },
+
+      // Lower Lip, Chin & Jawline
+      { x: -25, y: 60, z: 78 },  { x: 0, y: 62, z: 84 },  { x: 25, y: 60, z: 78 },
+      { x: -55, y: 65, z: 45 },  { x: 55, y: 65, z: 45 },
+      { x: -30, y: 90, z: 65 },  { x: 0, y: 100, z: 72 }, { x: 30, y: 90, z: 65 }, // Chin tip
+      { x: -65, y: 75, z: 15 },  { x: 65, y: 75, z: 15 }, // Jaw angles
     ];
 
-    let angleX = 0.003;
-    let angleY = 0.006;
+    const headScale = compact ? 1.0 : 1.35;
+    const nodes = rawHeadVertices.map((v) => ({
+      x: v.x * headScale,
+      y: v.y * headScale,
+      z: v.z * headScale,
+      baseX: v.x * headScale,
+      baseY: v.y * headScale,
+      baseZ: v.z * headScale,
+    }));
+
+    // Facial Landmark Reticle Targets
+    const landmarks = [
+      { x: -30 * headScale, y: -30 * headScale, z: 80 * headScale, label: "Left Eye" },
+      { x: 30 * headScale,  y: -30 * headScale, z: 80 * headScale, label: "Right Eye" },
+      { x: 0,              y: 5 * headScale,   z: 112 * headScale, label: "Nose Tip" },
+      { x: 0,              y: 100 * headScale, z: 72 * headScale, label: "Chin Tip" },
+      { x: -35 * headScale, y: 40 * headScale,  z: 75 * headScale, label: "Mouth-L" },
+      { x: 35 * headScale,  y: 40 * headScale,  z: 75 * headScale, label: "Mouth-R" },
+    ];
+
+    let angleX = 0.002;
+    let angleY = 0.005;
     let mouseX = 0;
     let mouseY = 0;
     let targetMouseX = 0;
     let targetMouseY = 0;
-    let scanY = -radius;
+    let scanY = -120 * headScale;
     let scanDir = 1;
 
     const handleMouseMove = (e) => {
@@ -107,7 +139,7 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
       ctx.clearRect(0, 0, width, height);
 
       const cx = width / 2;
-      const cy = height / 2;
+      const cy = height / 2 + 10;
 
       // Mouse Parallax Easing
       mouseX += (targetMouseX - mouseX) * 0.05;
@@ -116,7 +148,7 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
       const curAngleY = angleY + mouseX;
       const curAngleX = angleX + mouseY;
 
-      // Render wireframe mesh
+      // Transform 3D Head Mesh
       const projNodes = [];
       for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i];
@@ -125,16 +157,16 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
         n.y = rot.y;
         n.z = rot.z;
 
-        const fov = 420;
-        const scale = fov / (fov + n.z + 200);
+        const fov = 450;
+        const scale = fov / (fov + n.z + 180);
         const px = cx + n.x * scale;
         const py = cy + n.y * scale;
 
         projNodes.push({ px, py, scale, z: n.z });
       }
 
-      // Connecting 3D wireframe edges (Navy / Emerald for Light Mode)
-      ctx.lineWidth = 1.0;
+      // Triangulated Low-Poly Wireframe Edges
+      ctx.lineWidth = 1.1;
       for (let i = 0; i < projNodes.length; i++) {
         for (let j = i + 1; j < projNodes.length; j++) {
           const n1 = projNodes[i];
@@ -143,8 +175,8 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
           const dy = n1.py - n2.py;
           const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < 68) {
-            const alpha = (1 - dist / 68) * 0.4 * Math.max(0, (n1.z + radius) / (radius * 2));
+          if (dist < 62 * headScale) {
+            const alpha = (1 - dist / (62 * headScale)) * 0.42 * Math.max(0.1, (n1.z + 120) / 240);
             ctx.strokeStyle = `rgba(30, 58, 138, ${alpha})`;
             ctx.beginPath();
             ctx.moveTo(n1.px, n1.py);
@@ -154,11 +186,11 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
         }
       }
 
-      // Nodes rendering
+      // Render Low-Poly Facet Vertices
       for (let i = 0; i < projNodes.length; i++) {
         const n = projNodes[i];
-        const alpha = Math.max(0.2, (n.z + radius) / (radius * 2));
-        const rSize = Math.max(1.2, 2.5 * n.scale);
+        const alpha = Math.max(0.2, (n.z + 120) / 240);
+        const rSize = Math.max(1.2, 2.6 * n.scale);
 
         ctx.fillStyle = `rgba(16, 185, 129, ${alpha})`;
         ctx.beginPath();
@@ -166,12 +198,12 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
         ctx.fill();
       }
 
-      // 3D Facial Landmarks with Reticles
+      // Render Biometric Facial Landmark Markers
       if (!compact) {
         landmarks.forEach((lm) => {
           const rot = rotate3D(lm, curAngleX, curAngleY);
-          const fov = 420;
-          const scale = fov / (fov + rot.z + 200);
+          const fov = 450;
+          const scale = fov / (fov + rot.z + 180);
           const px = cx + rot.x * scale;
           const py = cy + rot.y * scale;
 
@@ -192,11 +224,12 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
         });
       }
 
-      // Laser Scanner Sweep Plane (Emerald / Blue Glow)
-      scanY += 1.6 * scanDir;
-      if (scanY > radius || scanY < -radius) scanDir *= -1;
+      // Laser Scanner Sweep Plane over Low-Poly Head
+      scanY += 1.8 * scanDir;
+      const maxScanRange = 110 * headScale;
+      if (scanY > maxScanRange || scanY < -maxScanRange) scanDir *= -1;
 
-      const scanScale = 420 / (420 + 200);
+      const scanScale = 450 / (450 + 180);
       const curScanY = cy + scanY * scanScale;
 
       const grad = ctx.createLinearGradient(0, curScanY - 14, 0, curScanY + 14);
@@ -205,13 +238,13 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
       grad.addColorStop(1, "rgba(16, 185, 129, 0)");
 
       ctx.fillStyle = grad;
-      ctx.fillRect(cx - radius * 1.2, curScanY - 10, radius * 2.4, 20);
+      ctx.fillRect(cx - 130 * headScale, curScanY - 10, 260 * headScale, 20);
 
       ctx.strokeStyle = "#10B981";
       ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.moveTo(cx - radius * 1.15, curScanY);
-      ctx.lineTo(cx + radius * 1.15, curScanY);
+      ctx.moveTo(cx - 120 * headScale, curScanY);
+      ctx.lineTo(cx + 120 * headScale, curScanY);
       ctx.stroke();
 
       animationFrameId = requestAnimationFrame(render);
@@ -240,7 +273,7 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
         }}
       />
 
-      {/* Floating Translucent Glassmorphism Status Cards (Light Theme) */}
+      {/* Floating Status Chips */}
       {showChips && !compact && (
         <div
           className="floating-chips-container"
@@ -258,7 +291,7 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
             <div
               className="glass-chip"
               style={{
-                background: "rgba(255, 255, 255, 0.85)",
+                background: "rgba(255, 255, 255, 0.88)",
                 backdropFilter: "blur(12px)",
                 border: "1px solid rgba(16, 185, 129, 0.4)",
                 padding: "8px 14px",
@@ -278,7 +311,7 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
             <div
               className="glass-chip"
               style={{
-                background: "rgba(255, 255, 255, 0.85)",
+                background: "rgba(255, 255, 255, 0.88)",
                 backdropFilter: "blur(12px)",
                 border: "1px solid rgba(37, 99, 235, 0.4)",
                 padding: "8px 14px",
@@ -301,7 +334,7 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
             <div
               className="glass-chip"
               style={{
-                background: "rgba(255, 255, 255, 0.85)",
+                background: "rgba(255, 255, 255, 0.88)",
                 backdropFilter: "blur(12px)",
                 border: "1px solid rgba(217, 119, 6, 0.4)",
                 padding: "8px 16px",
