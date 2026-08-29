@@ -1,11 +1,28 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 /**
- * Interactive 3D Biometric Face Mesh & Neural Particle Canvas.
- * Renders a 3D rotating face-scanning grid with laser sweeps and mouse parallax.
+ * 3D Face Biometric Particle Mesh & Laser Sweep Scene.
+ * Features rotating low-poly head landmark geometry, glowing scanning plane,
+ * mouse parallax, and orbiting translucent glassmorphism status chips.
  */
-export default function ThreeDFaceCanvas() {
+export default function ThreeDFaceCanvas({ compact = false, showChips = true }) {
   const canvasRef = useRef(null);
+  const [activeChipIndex, setActiveChipIndex] = useState(0);
+
+  const chips = [
+    { text: "✨ Face Matched — 98.2%", icon: "✓", color: "#14B8A6" },
+    { text: "⚡ Attendance Marked", icon: "🕒 09:41 AM", color: "#3B82F6" },
+    { text: "👤 57 Students Recognized", icon: "CS-3A", color: "#06B6D4" },
+  ];
+
+  // Cycle floating status chip index every 2.8s
+  useEffect(() => {
+    if (!showChips) return;
+    const interval = setInterval(() => {
+      setActiveChipIndex((prev) => (prev + 1) % chips.length);
+    }, 2800);
+    return () => clearInterval(interval);
+  }, [showChips]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -24,10 +41,10 @@ export default function ThreeDFaceCanvas() {
 
     window.addEventListener("resize", handleResize);
 
-    // 3D Sphere & Face Landmark Mesh Generation
-    const numNodes = 75;
+    // 3D Nodes generation representing stylized face mesh
+    const numNodes = compact ? 50 : 90;
     const nodes = [];
-    const radius = Math.min(width, height) * 0.32;
+    const radius = Math.min(width, height) * (compact ? 0.28 : 0.34);
 
     for (let i = 0; i < numNodes; i++) {
       const phi = Math.acos(-1 + (2 * i) / numNodes);
@@ -36,55 +53,49 @@ export default function ThreeDFaceCanvas() {
         x: radius * Math.cos(theta) * Math.sin(phi),
         y: radius * Math.sin(theta) * Math.sin(phi),
         z: radius * Math.cos(phi),
-        baseX: radius * Math.cos(theta) * Math.sin(phi),
-        baseY: radius * Math.sin(theta) * Math.sin(phi),
-        baseZ: radius * Math.cos(phi),
         pulse: Math.random() * Math.PI * 2,
       });
     }
 
-    // Facial landmark facial feature coordinates (Eye, Nose, Mouth wireframe)
+    // Facial landmark features (Eyes, Nose, Mouth, Jaw, Brow contours)
     const landmarks = [
-      { x: -35, y: -25, z: 75, label: "Eye-L" },
-      { x: 35, y: -25, z: 75, label: "Eye-R" },
-      { x: 0, y: 5, z: 95, label: "Nose Tip" },
-      { x: 0, y: 38, z: 80, label: "Jaw Center" },
-      { x: -28, y: 30, z: 75, label: "Mouth-L" },
-      { x: 28, y: 30, z: 75, label: "Mouth-R" },
-      { x: -55, y: -45, z: 50, label: "Brow-L" },
-      { x: 55, y: -45, z: 50, label: "Brow-R" },
+      { x: -38, y: -28, z: 80, label: "Left Eye" },
+      { x: 38, y: -28, z: 80, label: "Right Eye" },
+      { x: 0, y: 5, z: 102, label: "Nose Tip" },
+      { x: 0, y: 42, z: 85, label: "Chin" },
+      { x: -30, y: 32, z: 78, label: "Mouth-L" },
+      { x: 30, y: 32, z: 78, label: "Mouth-R" },
+      { x: -58, y: -48, z: 55, label: "Brow-L" },
+      { x: 58, y: -48, z: 55, label: "Brow-R" },
     ];
 
-    let angleX = 0.005;
-    let angleY = 0.008;
+    let angleX = 0.003;
+    let angleY = 0.006;
     let mouseX = 0;
     let mouseY = 0;
     let targetMouseX = 0;
     let targetMouseY = 0;
     let scanY = -radius;
-    let scanDirection = 1;
+    let scanDir = 1;
 
     const handleMouseMove = (e) => {
       const rect = canvas.getBoundingClientRect();
-      targetMouseX = (e.clientX - rect.left - rect.width / 2) * 0.0008;
-      targetMouseY = (e.clientY - rect.top - rect.height / 2) * 0.0008;
+      targetMouseX = (e.clientX - rect.left - rect.width / 2) * 0.0006;
+      targetMouseY = (e.clientY - rect.top - rect.height / 2) * 0.0006;
     };
 
     window.addEventListener("mousemove", handleMouseMove);
 
-    // 3D Rotation helper
     const rotate3D = (node, rx, ry) => {
-      // Rotate Y
-      let cosY = Math.cos(ry);
-      let sinY = Math.sin(ry);
-      let x1 = node.x * cosY - node.z * sinY;
-      let z1 = node.z * cosY + node.x * sinY;
+      const cosY = Math.cos(ry);
+      const sinY = Math.sin(ry);
+      const x1 = node.x * cosY - node.z * sinY;
+      const z1 = node.z * cosY + node.x * sinY;
 
-      // Rotate X
-      let cosX = Math.cos(rx);
-      let sinX = Math.sin(rx);
-      let y2 = node.y * cosX - z1 * sinX;
-      let z2 = z1 * cosX + node.y * sinX;
+      const cosX = Math.cos(rx);
+      const sinX = Math.sin(rx);
+      const y2 = node.y * cosX - z1 * sinX;
+      const z2 = z1 * cosX + node.y * sinX;
 
       return { x: x1, y: y2, z: z2 };
     };
@@ -102,40 +113,39 @@ export default function ThreeDFaceCanvas() {
       mouseX += (targetMouseX - mouseX) * 0.05;
       mouseY += (targetMouseY - mouseY) * 0.05;
 
-      const currentAngleY = angleY + mouseX;
-      const currentAngleX = angleX + mouseY;
+      const curAngleY = angleY + mouseX;
+      const curAngleX = angleX + mouseY;
 
-      // Update & project nodes
-      const projectedNodes = [];
+      // Render wireframe mesh
+      const projNodes = [];
       for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i];
-        // Rotate 3D
-        const rotated = rotate3D(n, currentAngleX, currentAngleY);
-        n.x = rotated.x;
-        n.y = rotated.y;
-        n.z = rotated.z;
+        const rot = rotate3D(n, curAngleX, curAngleY);
+        n.x = rot.x;
+        n.y = rot.y;
+        n.z = rot.z;
 
-        const fov = 400;
+        const fov = 420;
         const scale = fov / (fov + n.z + 200);
         const px = cx + n.x * scale;
         const py = cy + n.y * scale;
 
-        projectedNodes.push({ px, py, scale, z: n.z, pulse: n.pulse });
+        projNodes.push({ px, py, scale, z: n.z });
       }
 
-      // Draw connecting wireframe lines between close 3D nodes
+      // Connecting 3D wireframe edges
       ctx.lineWidth = 0.8;
-      for (let i = 0; i < projectedNodes.length; i++) {
-        for (let j = i + 1; j < projectedNodes.length; j++) {
-          const n1 = projectedNodes[i];
-          const n2 = projectedNodes[j];
+      for (let i = 0; i < projNodes.length; i++) {
+        for (let j = i + 1; j < projNodes.length; j++) {
+          const n1 = projNodes[i];
+          const n2 = projNodes[j];
           const dx = n1.px - n2.px;
           const dy = n1.py - n2.py;
           const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < 65) {
-            const alpha = (1 - dist / 65) * 0.35 * Math.max(0, (n1.z + radius) / (radius * 2));
-            ctx.strokeStyle = `rgba(16, 185, 129, ${alpha})`;
+          if (dist < 68) {
+            const alpha = (1 - dist / 68) * 0.32 * Math.max(0, (n1.z + radius) / (radius * 2));
+            ctx.strokeStyle = `rgba(20, 184, 166, ${alpha})`;
             ctx.beginPath();
             ctx.moveTo(n1.px, n1.py);
             ctx.lineTo(n2.px, n2.py);
@@ -144,73 +154,65 @@ export default function ThreeDFaceCanvas() {
         }
       }
 
-      // Draw projected nodes
-      for (let i = 0; i < projectedNodes.length; i++) {
-        const n = projectedNodes[i];
-        const alpha = Math.max(0.2, (n.z + radius) / (radius * 2));
-        const radiusSize = Math.max(1, 2.5 * n.scale);
+      // Nodes rendering
+      for (let i = 0; i < projNodes.length; i++) {
+        const n = projNodes[i];
+        const alpha = Math.max(0.15, (n.z + radius) / (radius * 2));
+        const rSize = Math.max(1, 2.2 * n.scale);
 
-        ctx.fillStyle = `rgba(52, 211, 153, ${alpha})`;
+        ctx.fillStyle = `rgba(56, 189, 248, ${alpha})`;
         ctx.beginPath();
-        ctx.arc(n.px, n.py, radiusSize, 0, Math.PI * 2);
+        ctx.arc(n.px, n.py, rSize, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Render 3D Facial Landmark Target Points
-      const projectedLandmarks = [];
-      landmarks.forEach((lm) => {
-        const rot = rotate3D(lm, currentAngleX, currentAngleY);
-        const fov = 400;
-        const scale = fov / (fov + rot.z + 200);
-        const px = cx + rot.x * scale;
-        const py = cy + rot.y * scale;
-        projectedLandmarks.push({ px, py, z: rot.z, label: lm.label });
+      // 3D Facial Landmarks with Reticles
+      if (!compact) {
+        landmarks.forEach((lm) => {
+          const rot = rotate3D(lm, curAngleX, curAngleY);
+          const fov = 420;
+          const scale = fov / (fov + rot.z + 200);
+          const px = cx + rot.x * scale;
+          const py = cy + rot.y * scale;
 
-        if (rot.z > -20) {
-          // Draw Glowing Biometric Target Reticle
-          ctx.strokeStyle = "#06b6d4";
-          ctx.lineWidth = 1.2;
-          ctx.beginPath();
-          ctx.arc(px, py, 6, 0, Math.PI * 2);
-          ctx.stroke();
+          if (rot.z > -10) {
+            ctx.strokeStyle = "#14B8A6";
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(px, py, 6, 0, Math.PI * 2);
+            ctx.stroke();
 
-          ctx.fillStyle = "#34d399";
-          ctx.fillRect(px - 1, py - 1, 2, 2);
+            ctx.fillStyle = "#38BDF8";
+            ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
 
-          // Render small vector data tag
-          ctx.font = "9px 'JetBrains Mono', monospace";
-          ctx.fillStyle = "rgba(6, 182, 212, 0.85)";
-          ctx.fillText(lm.label, px + 8, py + 3);
-        }
-      });
+            ctx.font = "9px 'JetBrains Mono', monospace";
+            ctx.fillStyle = "rgba(20, 184, 166, 0.85)";
+            ctx.fillText(lm.label, px + 8, py + 3);
+          }
+        });
+      }
 
-      // Draw Laser Scanning Sweep Line across the 3D Grid
-      scanY += 1.8 * scanDirection;
-      if (scanY > radius || scanY < -radius) scanDirection *= -1;
+      // Laser Scanner Sweep Plane
+      scanY += 1.6 * scanDir;
+      if (scanY > radius || scanY < -radius) scanDir *= -1;
 
-      const scanScale = 400 / (400 + 200);
-      const currentScanY = cy + scanY * scanScale;
+      const scanScale = 420 / (420 + 200);
+      const curScanY = cy + scanY * scanScale;
 
-      const grad = ctx.createLinearGradient(0, currentScanY - 12, 0, currentScanY + 12);
-      grad.addColorStop(0, "rgba(6, 182, 212, 0)");
-      grad.addColorStop(0.5, "rgba(52, 211, 153, 0.65)");
-      grad.addColorStop(1, "rgba(6, 182, 212, 0)");
+      const grad = ctx.createLinearGradient(0, curScanY - 14, 0, curScanY + 14);
+      grad.addColorStop(0, "rgba(20, 184, 166, 0)");
+      grad.addColorStop(0.5, "rgba(20, 184, 166, 0.55)");
+      grad.addColorStop(1, "rgba(20, 184, 166, 0)");
 
       ctx.fillStyle = grad;
-      ctx.fillRect(cx - radius * 1.2, currentScanY - 8, radius * 2.4, 16);
+      ctx.fillRect(cx - radius * 1.2, curScanY - 10, radius * 2.4, 20);
 
-      // Scanning indicator bar line
-      ctx.strokeStyle = "#34d399";
+      ctx.strokeStyle = "#38BDF8";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(cx - radius * 1.1, currentScanY);
-      ctx.lineTo(cx + radius * 1.1, currentScanY);
+      ctx.moveTo(cx - radius * 1.15, curScanY);
+      ctx.lineTo(cx + radius * 1.15, curScanY);
       ctx.stroke();
-
-      // Top Overlay HUD Tag
-      ctx.font = "11px 'JetBrains Mono', monospace";
-      ctx.fillStyle = "#10b981";
-      ctx.fillText(`[3D BIOMETRIC SCAN · ACTIVE]`, cx - 90, cy - radius * 1.15);
 
       animationFrameId = requestAnimationFrame(render);
     };
@@ -222,40 +224,100 @@ export default function ThreeDFaceCanvas() {
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("mousemove", handleMouseMove);
     };
-  }, []);
+  }, [compact]);
 
   return (
-    <div className="three-d-container" style={{ position: "relative", width: "100%", height: "100%", minHeight: "380px" }}>
+    <div className="three-d-canvas-wrapper" style={{ position: "relative", width: "100%", height: "100%", minHeight: compact ? "260px" : "440px" }}>
       <canvas
         ref={canvasRef}
         style={{
           display: "block",
           width: "100%",
           height: "100%",
-          borderRadius: "16px",
-          background: "radial-gradient(circle at center, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.95) 75%)",
-          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(52, 211, 153, 0.2)",
+          borderRadius: "20px",
+          background: "radial-gradient(ellipse at center, rgba(20, 184, 166, 0.08) 0%, rgba(9, 13, 22, 0.95) 75%)",
+          boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(20, 184, 166, 0.25)",
         }}
       />
-      <div
-        className="three-d-badge"
-        style={{
-          position: "absolute",
-          bottom: "16px",
-          right: "16px",
-          background: "rgba(15, 23, 42, 0.85)",
-          backdropFilter: "blur(8px)",
-          border: "1px solid rgba(52, 211, 153, 0.3)",
-          borderRadius: "8px",
-          padding: "6px 12px",
-          fontSize: "11px",
-          color: "#34d399",
-          fontFamily: "'JetBrains Mono', monospace",
-          pointerEvents: "none",
-        }}
-      >
-        ⚡ Real-time 3D Biometric Mesh
-      </div>
+
+      {/* Floating Translucent Glassmorphism Status Cards */}
+      {showChips && !compact && (
+        <div
+          className="floating-chips-container"
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            display: "flex",
+            flexDirection: "column",
+            justify: "space-between",
+            padding: "24px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <div
+              className="glass-chip"
+              style={{
+                background: "rgba(15, 23, 42, 0.75)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(20, 184, 166, 0.4)",
+                padding: "8px 14px",
+                borderRadius: "12px",
+                color: "#14B8A6",
+                fontSize: "12px",
+                fontFamily: "'JetBrains Mono', monospace",
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                transition: "all 0.5s ease",
+                opacity: activeChipIndex === 0 ? 1 : 0.4,
+                transform: activeChipIndex === 0 ? "scale(1.05) translateY(0)" : "scale(0.95) translateY(4px)",
+              }}
+            >
+              {chips[0].text}
+            </div>
+            <div
+              className="glass-chip"
+              style={{
+                background: "rgba(15, 23, 42, 0.75)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(59, 130, 246, 0.4)",
+                padding: "8px 14px",
+                borderRadius: "12px",
+                color: "#60A5FA",
+                fontSize: "12px",
+                fontFamily: "'JetBrains Mono', monospace",
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                transition: "all 0.5s ease",
+                opacity: activeChipIndex === 1 ? 1 : 0.4,
+                transform: activeChipIndex === 1 ? "scale(1.05) translateY(0)" : "scale(0.95) translateY(4px)",
+              }}
+            >
+              {chips[1].text}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
+            <div
+              className="glass-chip"
+              style={{
+                background: "rgba(15, 23, 42, 0.75)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(6, 182, 212, 0.4)",
+                padding: "8px 16px",
+                borderRadius: "12px",
+                color: "#38BDF8",
+                fontSize: "12px",
+                fontFamily: "'JetBrains Mono', monospace",
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                transition: "all 0.5s ease",
+                opacity: activeChipIndex === 2 ? 1 : 0.4,
+                transform: activeChipIndex === 2 ? "scale(1.05) translateY(0)" : "scale(0.95) translateY(4px)",
+              }}
+            >
+              {chips[2].text}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
