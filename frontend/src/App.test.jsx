@@ -31,10 +31,10 @@ describe("HomeGate routing", () => {
     vi.clearAllMocks();
   });
 
-  it("shows the Landing page to visitors (Login button, not the dashboard)", () => {
+  it("shows the Landing page to visitors (Sign In button, not the dashboard)", () => {
     useAuth.mockReturnValue({ user: null, loading: false });
     renderApp();
-    expect(screen.getByRole("link", { name: "Login" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /sign in/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Mark Attendance")).not.toBeInTheDocument();
   });
 

@@ -27,6 +27,7 @@ export default function ThreeDFaceCanvas({ compact = false, showChips = true }) 
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     let animationFrameId;
 
     let width = (canvas.width = canvas.parentElement.clientWidth || 500);

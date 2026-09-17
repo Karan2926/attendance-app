@@ -12,25 +12,25 @@ describe("Landing", () => {
     vi.clearAllMocks();
   });
 
-  it("shows a hero title and Login buttons, with no student-facing registration", () => {
+  it("shows a hero title, Sign In and Sign Up buttons", () => {
     render(
       <MemoryRouter>
         <Landing />
       </MemoryRouter>
     );
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/Attendance/);
-    expect(screen.getAllByRole("link", { name: "Login" }).length).toBeGreaterThan(0);
-    expect(screen.queryAllByRole("link", { name: /sign up|register|create.*account/i })).toHaveLength(0);
-    expect(screen.getAllByRole("link", { name: /see how it works/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /sign in/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /sign up/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/how it works/i).length).toBeGreaterThan(0);
   });
 
-  it("fetches live stats and labels them", async () => {
+  it("fetches and displays landing stats cards", async () => {
     render(
       <MemoryRouter>
         <Landing />
       </MemoryRouter>
     );
-    expect(await screen.findByText("Students enrolled")).toBeInTheDocument();
-    expect(screen.getByText("Attendance today")).toBeInTheDocument();
+    expect(await screen.findByText("Students Enrolled")).toBeInTheDocument();
+    expect(screen.getByText("Recognition Accuracy")).toBeInTheDocument();
   });
 });

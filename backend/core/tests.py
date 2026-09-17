@@ -14,6 +14,7 @@ from .models import (
     Attendance,
     AuditLog,
     Enrollment,
+    PendingRegistration,
     RoleUser,
     SchoolClass,
     Student,
@@ -89,28 +90,27 @@ class AuthTests(TestCase):
 
     def test_register_student(self):
         cls = SchoolClass.objects.create(name="CSE", section="A")
-        Student.objects.create(name="Sam", roll="R1", school_class=cls)
         res = self.client.post(
             "/api/auth/register",
-            {"roll": "R1", "username": "samuser", "password": "longpassword"},
+            {"roll": "R1", "name": "Sam", "class_id": cls.id},
         )
-        self.assertEqual(res.status_code, 201)
-        self.assertNotIn("token", res.data)
-        self.assertIn("attendance_token", res.cookies)
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data["status"], "pending")
+        self.assertTrue(PendingRegistration.objects.filter(roll="R1").exists())
 
-    def test_register_unknown_roll(self):
+    def test_register_missing_fields(self):
         res = self.client.post(
             "/api/auth/register",
-            {"roll": "NOPE", "username": "nopeuser", "password": "longpassword"},
+            {"roll": "", "name": "Sam"},
         )
         self.assertEqual(res.status_code, 400)
 
-    def test_register_short_password(self):
+    def test_register_duplicate_pending(self):
         cls = SchoolClass.objects.create(name="CSE", section="A")
-        Student.objects.create(name="Sam", roll="R1", school_class=cls)
+        PendingRegistration.objects.create(name="Sam", roll="R1", school_class=cls, status=PendingRegistration.STATUS_PENDING)
         res = self.client.post(
             "/api/auth/register",
-            {"roll": "R1", "username": "samuser2", "password": "short"},
+            {"roll": "R1", "name": "Sam", "class_id": cls.id},
         )
         self.assertEqual(res.status_code, 400)
 
@@ -463,9 +463,10 @@ class RegisterExportTests(TestCase):
         Student.objects.create(name="S1", roll="1", school_class=self.cls)
 
     def test_register_export_meta(self):
+        import datetime
         res = self.c.get("/api/register_export")
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data["current_month"], 8)
+        self.assertEqual(res.data["current_month"], datetime.date.today().month)
         self.assertIn("month_names", res.data)
 
     def test_register_export_xlsx(self):

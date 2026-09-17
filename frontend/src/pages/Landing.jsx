@@ -79,51 +79,6 @@ function StatCard({ icon, label, value, loaded, start, suffix = "" }) {
   );
 }
 
-const TECH_STACK = [
-  {
-    name: "InsightFace / ArcFace",
-    category: "Biometric AI Model",
-    desc: "Deep neural network embedding matching with 99.2% accuracy.",
-    icon: "🧠",
-    badge: "AI Core",
-  },
-  {
-    name: "Django REST Framework",
-    category: "Python Backend",
-    desc: "High-throughput API views, custom auth backend & PostgreSQL ORM.",
-    icon: "🐍",
-    badge: "Backend",
-  },
-  {
-    name: "React 18 + Vite",
-    category: "Single Page App",
-    desc: "Ultra-fast reactive UI with custom hooks for webcam stream capture.",
-    icon: "⚡",
-    badge: "Frontend",
-  },
-  {
-    name: "PostgreSQL Database",
-    category: "Relational Storage",
-    desc: "ACID compliant persistence for student profiles, logs & audit trails.",
-    icon: "🐘",
-    badge: "Database",
-  },
-  {
-    name: "Nginx & Gunicorn",
-    category: "Server Proxy",
-    desc: "Production reverse proxy handling SSL encryption & static assets.",
-    icon: "🚀",
-    badge: "Server",
-  },
-  {
-    name: "Security & Permissions",
-    category: "Edge Protection",
-    desc: "HttpOnly cookies, HSTS headers & role-based permissions.",
-    icon: "🛡️",
-    badge: "Security",
-  },
-];
-
 const FEATURES = [
   {
     icon: "📸",
@@ -203,7 +158,6 @@ export default function Landing() {
           <Brand />
           <nav className="light-nav-links">
             <a href="#how-it-works">How it works</a>
-            <a href="#tech-stack">Tech Stack</a>
             <a href="#features">Features</a>
           </nav>
           <div className="light-nav-actions">
@@ -321,33 +275,8 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ---------- Tech Stack Section (Interactive 3D Tilt Cards) ---------- */}
-      <section id="tech-stack" className="light-section alt-bg-light">
-        <div className="light-container">
-          <div className="light-section-header text-center">
-            <div className="pill-badge-light">Architecture</div>
-            <h2 className="light-section-title">Built On Enterprise Tech</h2>
-            <p className="light-section-sub">
-              Move your cursor over cards to explore our production tech stack in 3D perspective.
-            </p>
-          </div>
-
-          <div className="tech-stack-grid">
-            {TECH_STACK.map((tech) => (
-              <TiltCard key={tech.name} className="tech-tilt-card-light">
-                <div className="tech-card-badge-light">{tech.badge}</div>
-                <div className="tech-card-icon">{tech.icon}</div>
-                <h3 className="tech-card-title-light">{tech.name}</h3>
-                <div className="tech-card-cat-light">{tech.category}</div>
-                <p className="tech-card-desc-light">{tech.desc}</p>
-              </TiltCard>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ---------- Features Grid Section ---------- */}
-      <section id="features" className="light-section">
+      <section id="features" className="light-section alt-bg-light">
         <div className="light-container">
           <div className="light-section-header text-center">
             <div className="pill-badge-light">Platform Capabilities</div>
